@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MCP Chat</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: false, theme: 'dark' });</script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      height: 100vh;
+      display: flex;
+      flex-direction: row;
+      overflow: hidden;
+    }
+
+    #sidebar {
+      width: 200px;
+      min-width: 200px;
+      background: #252525;
+      border-right: 1px solid #333;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+    }
+
+    #sidebar-title {
+      font-size: 0.8em;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #333;
+    }
+
+    .doc-item {
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85em;
+      color: #ccc;
+    }
+    .doc-item:hover { background: #333; color: #fff; }
+
+    #chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;        /* keeps input bar pinned at bottom */
+      min-height: 0;           /* FIX: allows flex child to shrink */
+    }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;        /* FIX: this is the scrollable container */
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;           /* FIX: required for flex+overflow to work */
+      scroll-behavior: smooth; /* FIX: smooth scrolling */
+    }
+
+    /* FIX: anchor element at top so upward scroll works naturally */
+    #messages-anchor {
+      flex-shrink: 0;
+      height: 0;
+    }
+
+    .msg {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .user      { background: #0e639c; align-self: flex-end; }
+    .assistant { background: #2d2d2d; align-self: flex-start; }
+
+    .tool-call {
+      background: #1a3a1a;
+      border: 1px solid #3a7a3a;
+      align-self: flex-start;
+      font-size: 0.85em;
+      color: #88cc88;
+    }
+
+    .tool-result {
+      background: #1a2a3a;
+      border: 1px solid #3a5a7a;
+      align-self: flex-start;
+      font-size: 0.85em;
+      color: #88aacc;
+    }
+
+    .mermaid-msg {
+      background: transparent;
+      align-self: flex-start;
+      padding: 16px;
+      max-width: 95%;
+      width: 95%;
+      overflow-x: auto;
+    }
+
+    .mermaid-msg svg {
+      width: 100% !important;
+      height: auto !important;
+      min-height: 300px;
+    }
+
+    #input-row {
+      display: flex;
+      padding: 16px;
+      gap: 10px;
+      border-top: 1px solid #333;
+      align-items: center;
+      flex-shrink: 0;          /* FIX: prevents input row from shrinking */
+    }
+
+    #input {
+      flex: 1;
+      background: #2d2d2d;
+      border: 1px solid #444;
+      color: #d4d4d4;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 14px;
+      outline: none;
+    }
+    #input:focus { border-color: #0e639c; }
+
+    #send {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: monospace;
+      white-space: nowrap;
+    }
+    #send:disabled { opacity: 0.5; cursor: not-allowed; }
+    .typing { opacity: 0.5; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <div id="sidebar">
+    <div id="sidebar-title">📄 Documents</div>
+    <div id="doc-list"></div>
+  </div>
+
+  <div id="chat-area">
+    <div id="messages">
+      <div id="messages-anchor"></div>
+    </div>
+    <div id="input-row">
+      <input id="input" placeholder="Type a message..." autofocus />
+      <button id="send">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById("messages");
+    const input      = document.getElementById("input");
+    const sendBtn    = document.getElementById("send");
+    const sessionId  = Math.random().toString(36).slice(2);
+
+    // FIX: scroll to bottom only when user is already near bottom
+    function scrollToBottomIfNeeded() {
+      const threshold = 100; // px from bottom
+      const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < threshold;
+      if (isNearBottom) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+    }
+
+    // ── Sidebar ───────────────────────────────────────────────────────
+    async function loadDocs() {
+      try {
+        const res       = await fetch("/resources");
+        const resources = await res.json();
+        const list      = document.getElementById("doc-list");
+        for (const r of resources) {
+          const div     = document.createElement("div");
+          div.className = "doc-item";
+          const id      = r.uri.replace("docs://documents/", "");
+          div.textContent = id;
+          div.onclick   = () => { input.value = `tell me about @${id}`; input.focus(); };
+          list.appendChild(div);
+        }
+      } catch (e) {
+        console.warn("Could not load docs", e);
+      }
+    }
+    loadDocs();
+
+    // ── Mermaid helpers ───────────────────────────────────────────────
+    function isMermaid(text) {
+      if (!text) return false;
+      return /^(flowchart|graph |sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|timeline|mindmap|xychart|sankey-beta|---\ntitle)/.test(text.trim());
+    }
+
+    async function renderMermaid(container, code) {
+      try {
+        container.innerHTML = "";
+        container.className = "msg mermaid-msg";
+        const id = "mermaid-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+        const { svg } = await mermaid.render(id, code.trim());
+        container.innerHTML = svg;
+      } catch (e) {
+        container.className = "msg assistant";
+        container.textContent = code;
+        console.warn("Mermaid render failed:", e);
+      }
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // ── Message helpers ───────────────────────────────────────────────
+    function addMessage(role, text) {
+      const div     = document.createElement("div");
+      div.className = `msg ${role}`;
+      messagesEl.appendChild(div);
+
+      if (text) {
+        if (isMermaid(text)) {
+          renderMermaid(div, text);
+        } else {
+          div.textContent = text;
+        }
+      }
+
+      scrollToBottomIfNeeded();
+      return div;
+    }
+
+    // ── Send message ──────────────────────────────────────────────────
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value      = "";
+      sendBtn.disabled = true;
+      addMessage("user", text);
+
+      const assistantDiv = addMessage("assistant", "");
+      assistantDiv.classList.add("typing");
+
+      // Always scroll to bottom when user sends a message
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      const commandMatch = text.match(/^\/(\w+)\s+(.+)$/);
+      const atMatch      = text.match(/@([\w.\-]+)/);
+
+      let fetchUrl  = "/chat";
+      let fetchBody = { message: text, sessionId };
+
+      if (commandMatch) {
+        fetchUrl  = "/command";
+        fetchBody = { command: commandMatch[1], docId: commandMatch[2], sessionId };
+      } else if (atMatch) {
+        const docId = atMatch[1];
+        try {
+          const r        = await fetch(`/resource?uri=docs://documents/${docId}`);
+          const contents = await r.json();
+          const docText  = contents[0]?.text ?? "";
+          fetchBody      = { message: text + `\n\n--- ${docId} ---\n${docText}`, sessionId };
+        } catch (e) {
+          console.warn("Could not load resource", e);
+        }
+      }
+
+      const res = await fetch(fetchUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fetchBody),
+      });
+
+      // ── SSE reading ───────────────────────────────────────────────
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer    = "";
+      let assistantFullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = JSON.parse(line.slice(6));
+
+          if (data.type === "text") {
+            assistantDiv.classList.remove("typing");
+            assistantFullText += data.content;
+            assistantDiv.textContent = assistantFullText;
+
+          } else if (data.type === "tool_call") {
+            addMessage("tool-call", `🔧 ${data.name}\n${JSON.stringify(data.args, null, 2)}`);
+
+          } else if (data.type === "tool_result") {
+            const resultText = Array.isArray(data.result)
+              ? data.result.join("\n")
+              : String(data.result);
+            const div = document.createElement("div");
+            div.className = "msg tool-result";
+            messagesEl.appendChild(div);
+            if (isMermaid(resultText)) {
+              renderMermaid(div, resultText);
+            } else {
+              div.textContent = `✅ ${data.name}\n${JSON.stringify(data.result, null, 2)}`;
+            }
+
+          } else if (data.type === "done") {
+            assistantDiv.classList.remove("typing");
+            if (isMermaid(assistantFullText)) {
+              renderMermaid(assistantDiv, assistantFullText);
+            }
+
+          } else if (data.type === "error") {
+            assistantDiv.classList.remove("typing");
+            assistantDiv.textContent = `Error: ${data.message}`;
+          }
+        }
+
+        scrollToBottomIfNeeded();
+      }
+
+      sendBtn.disabled = false;
+      input.focus();
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    input.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
+  </script>
+</body>
+</html>
