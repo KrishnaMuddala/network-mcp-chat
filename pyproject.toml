@@ -1,19 +1,51 @@
+
 [project]
-name = "app"
+name = "network-mcp-chat"
 version = "0.1.0"
 description = "MCP Chat with local LLM (Ollama)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12,<3.14"
+
 dependencies = [
+    # Core
     "openai>=1.0.0",
     "mcp[cli]>=1.8.0",
     "prompt-toolkit>=3.0.51",
     "python-dotenv>=1.1.0",
+
+    # Networking / SSH
     "netmiko>=4.6.0",
+    "aiohttp>=3.9.0,<4.0.0",
+    "requests>=2.31.0,<3.0.0",
+
+    # Flask server
+    "flask>=3.0.0,<4.0.0",
+
+    # System monitoring
+    "psutil>=5.9.0,<7.0.0",
+
+    # Security
+    "bcrypt>=4.0.0,<5.0.0",
+    "mitmproxy>=9.0.0,<11.0.0",
+
+    # Browser automation
+    "selenium>=4.15.0,<5.0.0",
+    "webdriver-manager>=4.0.0,<5.0.0",
+
+    # Web scraping
+    "beautifulsoup4>=4.12.0,<5.0.0",
+]
+
+[project.optional-dependencies]
+# Install with: uv pip install -e ".[security]"
+# Requires Python 3.12, will NOT work on 3.14
+security = [
+    "pwntools>=4.10.0,<4.13.0",
+    "angr>=9.2.0,<10.0.0",
 ]
 
 [tool.setuptools.packages.find]
 exclude = ["assets*", "public*", "node_modules*", "tests*"]
 
-[pip]
+[tool.uv]
 link-mode = "copy"

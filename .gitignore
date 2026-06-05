@@ -17,3 +17,8 @@ backup.txt
 package-lock.json
 *.txt
 .venv/*
+app.egg-info/PKG-INFO
+network_mcp_chat.egg-info/PKG-INFO
+app.egg-info/PKG-INFO
+*.log
+app.egg-info/PKG-INFO
