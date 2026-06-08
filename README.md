@@ -231,7 +231,7 @@ pip install nuclei-tools subfinder httpx-toolkit
 
 > **Windows:** HexStrike is not recommended on Windows — `which` command doesn't exist and most security tools aren't available natively. Use WSL or macOS instead.
 
-## Forward Networks Demo
+## HexStriket MCP chat Demo
 
 ![HexStrike MCP Chat Streamable http demo](assets/Hexstrike_scan.png)
 *HexStrike  MCP Chat running with qwen2.5:7b via Ollama on macOS*
