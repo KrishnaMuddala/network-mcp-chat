@@ -373,7 +373,7 @@ async function ollamaChat(prompt, timeoutMs = 300000) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'qwen2.5:7b',
+        model: currentModel,
         messages: [{ role: 'user', content: prompt }],
         stream: false
       }),
