@@ -3,7 +3,11 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import OpenAI from "openai";
 import * as dotenv from "dotenv";
-
+import multer from 'multer';
+import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+import mammoth from 'mammoth';
+import fs from 'fs';
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 dotenv.config();
 
 const app = express();
@@ -321,6 +325,108 @@ app.get("/resource", async (req, res) => {
     const contents = await mcpClient.readResource(uri);
     res.json(contents);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 20 * 1024 * 1024 } }); // 20MB cap
+
+// --- Text extraction per file type ---
+async function extractText(filePath, mimetype, originalName) {
+  const ext = originalName.toLowerCase().split('.').pop();
+
+  if (ext === 'pdf') {
+    const buf = fs.readFileSync(filePath);
+    const data = await pdfParse(buf);
+    return data.text;
+  }
+
+  if (ext === 'docx') {
+    const result = await mammoth.extractRawText({ path: filePath });
+    return result.value;
+  }
+
+  if (ext === 'txt' || ext === 'csv' || ext === 'log') {
+    return fs.readFileSync(filePath, 'utf-8');
+  }
+
+  throw new Error(`Unsupported file type: ${ext}`);
+}
+
+// --- Chunking (fits qwen2.5:7b context) ---
+function chunkText(text, maxChars = 3000) {
+  const chunks = [];
+  for (let i = 0; i < text.length; i += maxChars) {
+    chunks.push(text.slice(i, i + maxChars));
+  }
+  return chunks;
+}
+
+// --- Call Ollama ---
+async function ollamaChat(prompt, timeoutMs = 300000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch('http://localhost:11434/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'qwen2.5:7b',
+        messages: [{ role: 'user', content: prompt }],
+        stream: false
+      }),
+      signal: controller.signal
+    });
+    const data = await res.json();
+    return data.message.content;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// --- Map-reduce summarization ---
+async function summarizeDocument(text) {
+  const chunks = chunkText(text);
+
+  if (chunks.length === 1) {
+    return await ollamaChat(`Summarize the following document concisely:\n\n${chunks[0]}`);
+  }
+
+  // Map: summarize each chunk
+  const chunkSummaries = [];
+  for (const [idx, chunk] of chunks.entries()) {
+    console.log(`Summarizing chunk ${idx + 1}/${chunks.length}`);
+    const summary = await ollamaChat(
+      `Summarize this section concisely, keeping key facts and figures:\n\n${chunk}`
+    );
+    chunkSummaries.push(summary);
+  }
+
+  // Reduce: combine chunk summaries
+  const combined = chunkSummaries.join('\n\n');
+  return await ollamaChat(
+    `Combine these section summaries into one coherent overall summary:\n\n${combined}`
+  );
+}
+
+// --- Route ---
+app.post('/api/upload-summarize', upload.single('file'), async (req, res) => {
+  try {
+    const { path: filePath, mimetype, originalname } = req.file;
+    const text = await extractText(filePath, mimetype, originalname);
+
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({ error: 'No text could be extracted from this file.' });
+    }
+
+    const summary = await summarizeDocument(text);
+
+    fs.unlinkSync(filePath); // cleanup temp file
+    res.json({ filename: originalname, summary, char_count: text.length });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });

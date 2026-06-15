@@ -13,13 +13,14 @@ from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutExc
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
 
-load_dotenv(dotenv_path=Path(__file__).parent / ".env")
+load_dotenv()
 # Suppress legacy cipher warnings from Cisco IOS 15.2
 warnings.filterwarnings("ignore")
 CISCO_DEVICE_HOST = os.getenv("CISCO_DEVICE_HOST", "")
 CISCO_DEVICE_USER = os.getenv("CISCO_DEVICE_USER", "")
 CISCO_DEVICE_PASS = os.getenv("CISCO_DEVICE_PASS", "")
 CISCO_DEVICE_PORT = int(os.getenv("CISCO_DEVICE_PORT", 22))
+print(f"config values: {CISCO_DEVICE_HOST}: {CISCO_DEVICE_USER}")
 # ─────────────────────────────────────────────
 # Safety: only allow read-only Cisco commands
 # ─────────────────────────────────────────────
@@ -111,7 +112,7 @@ def ssh_run_command(host: str, command: str) -> dict:
 # ─────────────────────────────────────────────
 # MCP Server Definition
 # ─────────────────────────────────────────────
-server = FastMCP(name="cisco-c2960cx", log_level="ERROR")
+server = FastMCP(name="cisco-c2960cx", log_level="ERROR",port=8001)
 
 
 @server.tool(

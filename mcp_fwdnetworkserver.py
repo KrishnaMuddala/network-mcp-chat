@@ -300,7 +300,8 @@ def get_device_basic_info(
     name="search_paths",
     description=(
         "Trace a packet path through the network from a source to a destination. "
-        "'dst_ip' is always required. Use 'src_ip' or 'from_device' (device name) as the source. "
+        "Use 'src_ip' or 'from_device' (device name) as the source is always required"
+        "'dst_ip' as the destination is always required. You can also specify ports, protocol, and intent to refine the search. "
         "Device names are NOT supported in dst_ip — use actual IP addresses."
     ),
 )
@@ -325,27 +326,26 @@ def search_paths(
         if not snapshot_id:
             snapshot_id = _get_latest_snapshot(client, network_id)
 
-        params = {"networkId": network_id, "snapshotId": snapshot_id}
-        body: dict = {
-            "dstIp": dst_ip,
-            "intent": intent,
-            "maxResults": max_results,
-        }
+        params = {"networkId": network_id } #, "snapshotId": snapshot_id}
+       
         if src_ip:
-            body["srcIp"] = src_ip
+            params["srcIp"] = src_ip
+        if dst_ip:
+            params["dstIp"] = dst_ip
         if from_device:
-            body["from"] = from_device
+            params["from"] = from_device
         if src_port:
-            body["srcPort"] = src_port
+            params["srcPort"] = src_port
         if dst_port:
-            body["dstPort"] = dst_port
+            params["dstPort"] = dst_port
         if ip_proto is not None:
-            body["ipProto"] = ip_proto
+            params["ipProto"] = ip_proto
+        if max_results:
+            params["maxResults"] = max_results
 
-        response = client.post(
-            f"{FORWARD_BASE_URL}/api/paths",
-            params=params,
-            json=body,
+        response = client.get(
+            f"{FORWARD_BASE_URL}/api/networks/{network_id}/paths",
+            params=params
         )
         response.raise_for_status()
         data = response.json()

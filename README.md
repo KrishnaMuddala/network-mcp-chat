@@ -180,6 +180,8 @@ search configs for interface shutdown
 ![Forward Networks MCP Chat Streamable http demo](assets/Forwardnetwork_mcpclient.png)
 *Forward Networks MCP Chat running with qwen2.5:7b via Ollama on Windows*
 
+![Document summary chat Streamable http demo](assets/Documentupload.png)
+*Document summary Chat running with qwen2.5:7b via Ollama on Windows*
 ### HexStrike Security Mode
 
 > **Platform:** macOS or Linux/Kali recommended. Windows has limited tool support.

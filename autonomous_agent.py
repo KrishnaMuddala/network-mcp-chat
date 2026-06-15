@@ -5,12 +5,13 @@ import json
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from openai import OpenAI
-
+from dotenv import load_dotenv
+load_dotenv()
 MCP_URL   = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
 LLM_URL   = os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:11434/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:7b")
-MAX_STEPS = 10  # prevent infinite loops
-
+MAX_STEPS = 20  # prevent infinite loops
+print(f"   ✅ using model: {LLM_MODEL}...")
 SYSTEM_PROMPT = """You are an autonomous network intelligence agent.
 
 You have access to Forward Networks tools. For complex tasks:
@@ -19,7 +20,7 @@ You have access to Forward Networks tools. For complex tasks:
 3. SYNTHESIZE — combine results into a clear answer
 
 Always:
-- Call list_networks first to get network_id if you don't have one
+- first Call list_networks first to get network_id if you don't have one and include default snapshot_id in all tool calls
 - Use output_format='graph' for topology/path questions
 - Use output_format='table' for inventory/compliance questions
 - If a tool fails, try an alternative approach
@@ -132,8 +133,9 @@ async def main():
     tasks = [
         "List all networks and show me the device inventory for the first one",
         "Find all EOL hardware in the network and show as a timeline graph",
-        "Trace the path from 192.168.1.10 to 10.0.0.1 on port 443 and show as a graph",
+        "Trace the path from atl-app-lb01 to 10.0.0.0 and show as a json",
         "Search for 'BGP' in device configs and summarize what you find",
+        
     ]
 
     print("Forward Networks Autonomous Agent")

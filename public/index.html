@@ -247,6 +247,45 @@
   </div>
 
   <script>
+appendMessage = (role, text) => {
+  const div     = document.createElement("div");
+  div.className = `msg ${role}`;
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+};
+
+const dropZone = document.getElementById('input');
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+
+dropZone.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+
+  appendMessage('user', `📎 ${file.name} (uploading...)`);
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch('/api/upload-summarize', { method: 'POST', body: formData });
+  const data = await res.json();
+
+  if (data.error) {
+    appendMessage('system', `Error: ${data.error}`);
+  } else {
+    appendMessage('assistant', `**Summary of ${data.filename}:**\n\n${data.summary}`);
+  }
+});
     const messagesEl = document.getElementById("messages");
     const input      = document.getElementById("input");
     const sendBtn    = document.getElementById("send");

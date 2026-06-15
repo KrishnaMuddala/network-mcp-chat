@@ -5,13 +5,15 @@ import json
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from openai import OpenAI
+from dotenv import load_dotenv
+load_dotenv()
 
 MCP_URL   = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
 LLM_URL   = os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:11434/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:7b")
 
 openai = OpenAI(base_url=LLM_URL, api_key="ollama")
-
+print(f"   ✅ using model: {LLM_MODEL}...")
 
 async def run_agent(user_message: str):
     async with streamablehttp_client(MCP_URL) as (read, write, _):
