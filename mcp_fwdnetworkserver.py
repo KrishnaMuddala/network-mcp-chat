@@ -6,7 +6,7 @@ from pydantic import Field
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts import base
 
-mcp = FastMCP("ForwardMCP", log_level="ERROR")
+mcp = FastMCP("ForwardMCP", log_level="ERROR",host="0.0.0.0")
 
 load_dotenv()
 

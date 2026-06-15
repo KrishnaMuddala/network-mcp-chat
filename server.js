@@ -8,10 +8,57 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 import mammoth from 'mammoth';
 import fs from 'fs';
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+import session from 'express-session';
+import bcrypt from 'bcryptjs';
+import { readFileSync } from 'fs';
+
+const users = JSON.parse(readFileSync('./users.json', 'utf-8'));
+
+
 dotenv.config();
 
 const app = express();
 app.use(express.json());
+
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'change-this-to-a-random-string',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false,        // set true when behind HTTPS/nginx
+    maxAge: 8 * 60 * 60 * 1000  // 8 hour session
+  }
+}));
+
+// ── Auth middleware ───────────────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  if (req.session?.user) return next();
+  if (req.path === '/login' || req.path === '/login.html' || req.path.startsWith('/css') || req.path.startsWith('/js')) {
+    return next();
+  }
+  return res.redirect('/login.html');
+}
+
+// ── Login route ──────────────────────────────────────────────────────────
+app.post('/login', express.urlencoded({ extended: true }), (req, res) => {
+  const { username, password } = req.body;
+  const user = users.find(u => u.username === username);
+
+  if (user && bcrypt.compareSync(password, user.passwordHash)) {
+    req.session.user = username;
+    return res.redirect('/');
+  }
+  return res.redirect('/login.html?error=1');
+});
+
+app.post('/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/login.html'));
+});
+
+// Apply auth to everything AFTER this line
+app.use(requireAuth);
+
 app.use(express.static("public"));
 
 // ── MCP + OpenAI setup ────────────────────────────────────────────────────
