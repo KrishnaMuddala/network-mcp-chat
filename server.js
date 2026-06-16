@@ -410,13 +410,13 @@ function chunkText(text, maxChars = 3000) {
   }
   return chunks;
 }
-
+const OLLAMA_CHAT_URL = process.env.OLLAMA_CHAT_URL ?? 'http://host.docker.internal:11434/api/chat';
 // --- Call Ollama ---
 async function ollamaChat(prompt, timeoutMs = 300000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch('http://localhost:11434/api/chat', {
+    const res = await fetch(OLLAMA_CHAT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

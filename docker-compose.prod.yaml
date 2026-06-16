@@ -1,0 +1,61 @@
+#production docker-compose.yaml for netops-mcp-chat application
+version: '3.8'
+
+services:
+  web-ui:
+    build: .
+    container_name: netops-web-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      - LOCAL_LLM_BASE_URL=http://host.docker.internal:11434/v1
+      - MCP_SERVER_URL=http://mcp-forward:8888/mcp
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - mcp-forward
+      - mcp-cisco
+    volumes:
+      - ./users.json:/app/users.json:ro
+      - uploads:/app/uploads
+
+  mcp-forward:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: mcp-forward
+    restart: unless-stopped
+    command: ["uv", "run", "mcp_fwdnetworkserver.py"]
+    env_file: .env
+    ports:
+      - "8888:8888"
+
+  # mcp-cisco:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.python
+  #   container_name: mcp-cisco
+  #   restart: unless-stopped
+  #   command: ["uv", "run", "mcp_cisco_c2960cx_server.py"]
+  #   env_file: .env
+  #   ports:
+  #     - "8001:8001"
+
+  nginx:
+    image: nginx:alpine
+    container_name: netops-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./.htpasswd:/etc/nginx/.htpasswd:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - web-ui
+
+volumes:
+  uploads:
