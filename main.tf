@@ -8,28 +8,67 @@ terraform {
 }
 
 provider "aws" {
-  region = "ap-southeast-1"  # Singapore - closest to you
+  region = "ap-southeast-1"
 }
 
-# ── Networking ──────────────────────────────────────────────────────────
+# ── IAM Role for Secrets Manager access ──────────────────────────────────
+resource "aws_iam_role" "netops_role" {
+  name = "netops-chat-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "netops_secrets_policy" {
+  name   = "netops-secrets-access"
+  role   = aws_iam_role.netops_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = "arn:aws:secretsmanager:ap-southeast-1:*:secret:netops-chat/*"
+    }]
+  })
+}
+
+resource "aws_iam_instance_profile" "netops_profile" {
+  name = "netops-chat-profile"
+  role = aws_iam_role.netops_role.name
+}
+
+# ── Security Group ────────────────────────────────────────────────────────
 resource "aws_security_group" "netops_sg" {
   name        = "netops-chat-sg"
   description = "NetOps Chat - restricted access"
 
   ingress {
-    description = "HTTPS from office/VPN only"
+    description = "HTTPS - open to all (nginx handles auth)"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description = "SSH admin"
+    description = "SSH admin - your IP only"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "ICMP ping"
+    from_port   = -1
+    to_port     = -1
+    protocol    = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -42,43 +81,100 @@ resource "aws_security_group" "netops_sg" {
   tags = { Name = "netops-chat-sg" }
 }
 
-# ── EC2 Instance (GPU) ────────────────────────────────────────────────────
+# ── EC2 Instance ──────────────────────────────────────────────────────────
 resource "aws_instance" "netops_gpu" {
-  ami                    = var.ubuntu_ami  # Ubuntu 22.04 in ap-southeast-1
-  instance_type          = "c6i.2xlarge"
+  ami                    = var.ubuntu_ami
+  instance_type          = "c6i.2xlarge"   # swap to g4dn.xlarge after GPU quota approved
   key_name               = var.key_pair_name
   vpc_security_group_ids = [aws_security_group.netops_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.netops_profile.name
 
   root_block_device {
-    volume_size = 100   # GB - model weights + Docker images
+    volume_size = 100
     volume_type = "gp3"
   }
 
-  tags = { Name = "netops-chat-gpu" }
+  tags = { Name = "netops-chat-cpu" }
 
   user_data = <<-EOF
     #!/bin/bash
-    apt update && apt install -y nvidia-driver-535 docker.io docker-compose-plugin
+    set -e
+    exec > /var/log/cloud-init-output.log 2>&1
+
+    echo "=== [1/7] System update ==="
+    apt update && apt upgrade -y
+    apt install -y git curl awscli ca-certificates gnupg
+
+    # Install Docker from official Docker repo (not Ubuntu's)
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg]  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    apt update
+    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+    systemctl enable docker
+    systemctl start docker
+
+    echo "=== [2/7] Install Ollama ==="
     curl -fsSL https://ollama.com/install.sh | sh
-    systemctl enable ollama
-    systemctl start ollama
-    ollama pull qwen2.5:7b
-    # 4. Deploy app
+
+    echo "=== [3/7] Start Ollama + pull model ==="
+    export HOME=/root
+    export OLLAMA_HOST=0.0.0.0:11434
+    sudo nohup ollama serve > /var/log/ollama.log 2>&1 &
+    sleep 20
+
+    # Wait until Ollama API responds
+    until curl -s http://localhost:11434/api/tags > /dev/null; do
+      echo "Waiting for Ollama..."
+      sleep 5
+    done
+
+    HOME=/root ollama pull qwen2.5:7b
+    echo "Model pulled successfully"
+
+    echo "=== [4/7] Clone repo ==="
+    cd /home/ubuntu
     git clone https://github.com/KrishnaMuddala/network-mcp-chat.git
     cd network-mcp-chat
-    cp env.example .env && nano .env
-    mkdir certs
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout certs/privkey.pem -out certs/fullchain.pem -subj "/CN=netops-internal"
-    docker compose -f docker-compose.prod.yml up --build -d
+
+    echo "=== [5/7] Pull secrets ==="
+    aws secretsmanager get-secret-value \
+      --secret-id "netops-chat/env" \
+      --region ap-southeast-1 \
+      --query SecretString \
+      --output text > .env
+
+    aws secretsmanager get-secret-value \
+      --secret-id "netops-chat/users" \
+      --region ap-southeast-1 \
+      --query SecretString \
+      --output text > users.json
+
+    echo "=== [6/7] TLS cert ==="
+    mkdir -p certs
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -keyout certs/privkey.pem \
+      -out certs/fullchain.pem \
+      -subj "/CN=netops-internal"
+
+    echo "=== [7/7] Deploy ==="
+    chown -R ubuntu:ubuntu /home/ubuntu/network-mcp-chat
+    docker compose -f docker-compose.yaml up --build -d
+
+    echo "=== Setup Complete ==="
   EOF
 }
 
-# ── Elastic IP (stable address) ───────────────────────────────────────────
+# ── Elastic IP ────────────────────────────────────────────────────────────
 resource "aws_eip" "netops_eip" {
   instance = aws_instance.netops_gpu.id
   domain   = "vpc"
 }
 
-output "public_ip" {
-  value = aws_eip.netops_eip.public_ip
+output "ssh_command" {
+  value = "ssh -i ec2-keypair.pem ubuntu@${aws_eip.netops_eip.public_ip}"
 }

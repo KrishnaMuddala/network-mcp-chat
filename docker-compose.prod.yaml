@@ -11,12 +11,12 @@ services:
     env_file: .env
     environment:
       - LOCAL_LLM_BASE_URL=http://host.docker.internal:11434/v1
-      - MCP_SERVER_URL=http://mcp-forward:8888/mcp
+      - MCP_SERVER_URL=http://mcp-forward:8000/mcp
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - mcp-forward
-      - mcp-cisco
+      # - mcp-cisco
     volumes:
       - ./users.json:/app/users.json:ro
       - uploads:/app/uploads
@@ -30,7 +30,7 @@ services:
     command: ["uv", "run", "mcp_fwdnetworkserver.py"]
     env_file: .env
     ports:
-      - "8888:8888"
+      - "8000:8000"
 
   # mcp-cisco:
   #   build:

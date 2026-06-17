@@ -24,10 +24,7 @@ app.egg-info/PKG-INFO
 app.egg-info/PKG-INFO
 users.json
 uploads/*
-
-
 .terraform.lock.hcl
-
 .terraform/
 terraform.tfstate
 terraform.tfstate.backup
