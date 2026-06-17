@@ -163,7 +163,7 @@ resource "aws_instance" "netops_gpu" {
 
     echo "=== [7/7] Deploy ==="
     chown -R ubuntu:ubuntu /home/ubuntu/network-mcp-chat
-    docker compose -f docker-compose.yaml up --build -d
+    docker compose -f docker-compose.prod.yaml up --build -d
 
     echo "=== Setup Complete ==="
   EOF
