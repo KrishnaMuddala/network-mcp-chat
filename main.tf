@@ -105,43 +105,47 @@ resource "aws_instance" "netops_gpu" {
     apt update && apt upgrade -y
     apt install -y git curl awscli ca-certificates gnupg
 
-    # Install Docker from official Docker repo (not Ubuntu's)
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
-
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg]  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
     apt update
     apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
     systemctl enable docker
     systemctl start docker
 
     echo "=== [2/7] Install Ollama ==="
     curl -fsSL https://ollama.com/install.sh | sh
 
-    echo "=== [3/7] Start Ollama + pull model ==="
-    export HOME=/root
-    export OLLAMA_HOST=0.0.0.0:11434
-    sudo nohup ollama serve > /var/log/ollama.log 2>&1 &
-    sleep 20
+    echo "=== [3/7] Configure Ollama to bind 0.0.0.0 ==="
+    # Create systemd override BEFORE starting ollama
+    mkdir -p /etc/systemd/system/ollama.service.d
+    cat > /etc/systemd/system/ollama.service.d/override.conf << 'OVERRIDE'
+    [Service]
+    Environment="OLLAMA_HOST=0.0.0.0:11434"
+    Environment="HOME=/root"
+    OVERRIDE
 
-    # Wait until Ollama API responds
+    systemctl daemon-reload
+    systemctl enable ollama
+    systemctl start ollama
+
+    echo "=== [4/7] Wait for Ollama API ==="
     until curl -s http://localhost:11434/api/tags > /dev/null; do
       echo "Waiting for Ollama..."
       sleep 5
     done
+    echo "Ollama ready"
 
     HOME=/root ollama pull qwen2.5:7b
     echo "Model pulled successfully"
 
-    echo "=== [4/7] Clone repo ==="
+    echo "=== [5/7] Clone repo ==="
     cd /home/ubuntu
     git clone https://github.com/KrishnaMuddala/network-mcp-chat.git
     cd network-mcp-chat
 
-    echo "=== [5/7] Pull secrets ==="
+    echo "=== [6/7] Pull secrets ==="
     aws secretsmanager get-secret-value \
       --secret-id "netops-chat/env" \
       --region ap-southeast-1 \
@@ -154,7 +158,7 @@ resource "aws_instance" "netops_gpu" {
       --query SecretString \
       --output text > users.json
 
-    echo "=== [6/7] TLS cert ==="
+    echo "=== [6b/7] TLS cert ==="
     mkdir -p certs
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
       -keyout certs/privkey.pem \
@@ -176,9 +180,9 @@ resource "aws_eip" "netops_eip" {
 }
 
 output "ssh_command" {
-  value = "ssh -i ec2-keypair.pem ubuntu@${aws_eip.netops_eip.public_ip}"
+  value = ssh -i ec2-keypair.pem ubuntu@${aws_eip.netops_eip.public_ip}
 }
 
 output "webui_url" {
-  value = "https://${aws_eip.netops_eip.public_ip}"
+  value = https://${aws_eip.netops_eip.public_ip}
 }
