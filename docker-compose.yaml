@@ -1,6 +1,4 @@
 #local docker-compose.yaml for netops-mcp-chat application
-version: '3.8'
-
 services:
   web-ui:
     build:
