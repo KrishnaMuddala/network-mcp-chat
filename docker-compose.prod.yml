@@ -14,7 +14,7 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - mcp-forward
-      # - mcp-cisco
+      - mcp-cisco
     volumes:
       - ./users.json:/app/users.json:ro
       - uploads:/app/uploads
@@ -30,16 +30,16 @@ services:
     ports:
       - "8000:8000"
 
-  # mcp-cisco:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.python
-  #   container_name: mcp-cisco
-  #   restart: unless-stopped
-  #   command: ["uv", "run", "mcp_cisco_c2960cx_server.py"]
-  #   env_file: .env
-  #   ports:
-  #     - "8001:8001"
+  mcp-cisco:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: mcp-cisco
+    restart: unless-stopped
+    command: ["uv", "run", "mcp_cisco_c2960cx_server.py"]
+    env_file: .env
+    ports:
+      - "8001:8001"
 
   nginx:
     image: nginx:alpine
