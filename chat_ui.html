@@ -18,7 +18,7 @@
       --text:      #c8d6e5;
       --text-dim:  #4a5568;
       --cisco:     #1a9fff;
-      --hexstrike: #ff3d71;
+      --forward: #ff3d71;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -113,7 +113,7 @@
     .suggestion.cisco { border-color: rgba(26,159,255,0.3); }
     .suggestion.cisco:hover { border-color: var(--cisco); color: var(--cisco); background: rgba(26,159,255,0.05); }
     .suggestion.hex { border-color: rgba(255,61,113,0.3); }
-    .suggestion.hex:hover { border-color: var(--hexstrike); color: var(--hexstrike); background: rgba(255,61,113,0.05); }
+    .suggestion.hex:hover { border-color: var(--forward); color: var(--forward); background: rgba(255,61,113,0.05); }
 
     /* ── Messages ── */
     #messages {
@@ -309,7 +309,7 @@
     }
 
     .tag.cisco   { background: rgba(26,159,255,0.15); color: var(--cisco); }
-    .tag.hex     { background: rgba(255,61,113,0.15); color: var(--hexstrike); }
+    .tag.hex     { background: rgba(255,61,113,0.15); color: var(--forward); }
   </style>
 </head>
 <body>
@@ -318,8 +318,8 @@
   <div class="logo">Net<span>Sec</span> Assistant</div>
   <div class="status-bar">
     <div class="status-item">
-      <div class="dot online" id="dot-hexstrike"></div>
-      <span id="label-hexstrike">HexStrike</span>
+      <div class="dot online" id="dot-forward"></div>
+      <span id="label-forward">forward</span>
     </div>
     <div class="status-item">
       <div class="dot online" id="dot-cisco"></div>
@@ -333,10 +333,10 @@
 </header>
 
 <div class="suggestions">
-  <button class="suggestion hex" onclick="send('Scan localhost:5000 for vulnerabilities')">🔍 Scan local website</button>
+  <!-- <button class="suggestion hex" onclick="send('Scan localhost:5000 for vulnerabilities')">🔍 Scan local website</button>
   <button class="suggestion hex" onclick="send('Run nmap scan on localhost:5000')">📡 Nmap scan</button>
-  <button class="suggestion hex" onclick="send('Check server health and available tools')">🏥 HexStrike health</button>
-  <button class="suggestion hex" onclick="send('Run nikto scan on http://localhost:5000')">🔬 Nikto scan</button>
+  <button class="suggestion hex" onclick="send('Check server health and available tools')">🏥 forward health</button>
+  <button class="suggestion hex" onclick="send('Run nikto scan on http://localhost:5000')">🔬 Nikto scan</button> -->
   <button class="suggestion cisco" onclick="send('Show interfaces status on the switch')">🔌 Interfaces status</button>
   <button class="suggestion cisco" onclick="send('Show VLAN brief on the switch')">🗂️ VLANs</button>
   <button class="suggestion cisco" onclick="send('Show MAC address table')">📋 MAC table</button>
@@ -351,7 +351,7 @@
 
 I can help you with two things:
 
-<span class="tag hex">HexStrike</span> Scan your local website at <strong>localhost:5000</strong> for vulnerabilities using tools like nmap, nikto, nuclei, gobuster and more.
+<span class="tag hex">forward</span> Scan your local website at <strong>localhost:5000</strong> for vulnerabilities using tools like nmap, nikto, nuclei, gobuster and more.
 
 <span class="tag cisco">Cisco</span> Query your Cisco C2960CX switch — show interfaces, VLANs, MAC table, ARP, spanning tree, and more.
 
@@ -390,9 +390,9 @@ Just ask naturally — I'll figure out which tool to use. Try the quick actions 
     try {
       const r = await fetch("/tools");
       const d = await r.json();
-      const hasHex    = d.tools.some(t => t.startsWith("hexstrike__"));
+      const hasForward    = d.tools.some(t => t.startsWith("hexstrike__"));
       const hasCisco  = d.tools.some(t => t.startsWith("cisco__"));
-      document.getElementById("dot-hexstrike").className = "dot " + (hasHex   ? "online" : "offline");
+      document.getElementById("dot-forward").className = "dot " + (hasForward   ? "online" : "offline");
       document.getElementById("dot-cisco").className     = "dot " + (hasCisco ? "online" : "offline");
     } catch {}
   }
