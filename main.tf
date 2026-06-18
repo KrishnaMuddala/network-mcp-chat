@@ -176,9 +176,9 @@ resource "aws_eip" "netops_eip" {
 }
 
 output "ssh_command" {
-  value = ssh -i ec2-keypair.pem ubuntu@${aws_eip.netops_eip.public_ip}
+  value = "ssh -i ec2-keypair.pem ubuntu@${aws_eip.netops_eip.public_ip}"
 }
 
 output "webui_url" {
-  value = https://${aws_eip.netops_eip.public_ip}
+  value = "https://${aws_eip.netops_eip.public_ip}"
 }
