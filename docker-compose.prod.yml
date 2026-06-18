@@ -20,7 +20,9 @@ services:
       - uploads:/app/uploads
 
   chat-ui:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.python
     container_name: netops-chat-ui
     restart: unless-stopped
     command: ["uv", "run", "chat_server.py"]

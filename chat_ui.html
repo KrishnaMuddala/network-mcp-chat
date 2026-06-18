@@ -388,7 +388,7 @@ Just ask naturally — I'll figure out which tool to use. Try the quick actions 
   // ── Check tool status ─────────────────────────────────────────────────────
   async function checkStatus() {
     try {
-      const r = await fetch("${BASE}/tools");
+      const r = await fetch("/tools");
       const d = await r.json();
       const hasHex    = d.tools.some(t => t.startsWith("hexstrike__"));
       const hasCisco  = d.tools.some(t => t.startsWith("cisco__"));
@@ -481,7 +481,7 @@ Just ask naturally — I'll figure out which tool to use. Try the quick actions 
     const aiBubble = addBubble("assistant", "", "typing");
 
     try {
-      const res = await fetch("${BASE}/chat", {
+      const res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, history: history.slice(0, -1) })
