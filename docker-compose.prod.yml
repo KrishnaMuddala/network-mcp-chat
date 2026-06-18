@@ -1,4 +1,4 @@
-#production docker-compose.yaml for netops-mcp-chat application
+# production docker-compose.yaml for netops-mcp-chat application
 services:
   web-ui:
     build: .
@@ -18,6 +18,25 @@ services:
     volumes:
       - ./users.json:/app/users.json:ro
       - uploads:/app/uploads
+
+  chat-ui:
+    build: .
+    container_name: netops-chat-ui
+    restart: unless-stopped
+    command: ["uv", "run", "chat_server.py"]
+    ports:
+      - "9000:9000"
+    env_file: .env
+    environment:
+      - LOCAL_LLM_BASE_URL=http://host.docker.internal:11434/v1
+      - CISCO_MCP_URL=http://mcp-cisco:8001/mcp
+      - HEXSTRIKE_MCP_URL=http://mcp-hexstrike:8002/mcp
+      - TARGET_WEBSITE=http://localhost:5000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - mcp-forward
+      - mcp-cisco
 
   mcp-forward:
     build:
@@ -54,6 +73,7 @@ services:
       - ./certs:/etc/nginx/certs:ro
     depends_on:
       - web-ui
+      - chat-ui    # ← added so nginx waits for both services
 
 volumes:
   uploads:
