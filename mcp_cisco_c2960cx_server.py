@@ -78,7 +78,7 @@ def ssh_run_command(host: str, command: str) -> dict:
             "reason": f"Command '{command}' is not in the read-only allowlist.",
             "allowed_commands": sorted(ALLOWED_COMMANDS)
         }
-    print(f"Running command on {host}: {CISCO_DEVICE_USER}")
+    print(f"Running command:{command} on {host}: {CISCO_DEVICE_USER}")
     try:
         device = {
             "device_type": "cisco_ios",
@@ -112,7 +112,7 @@ def ssh_run_command(host: str, command: str) -> dict:
 # ─────────────────────────────────────────────
 # MCP Server Definition
 # ─────────────────────────────────────────────
-server = FastMCP(name="cisco-c2960cx", log_level="ERROR",port=8001)
+server = FastMCP(name="cisco-c2960cx", host="0.0.0.0", log_level="ERROR", port=8001)
 
 
 @server.tool(

@@ -1,6 +1,6 @@
 """
 Unified Chat Server
-Connects Ollama + Cisco MCP + HexStrike MCP via a single web chat UI
+Connects Ollama + Cisco MCP + FORWARD MCP via a single web chat UI
 Runs on http://localhost:9000
 """
 
@@ -21,7 +21,8 @@ load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 OLLAMA_BASE_URL   = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OLLAMA_MODEL      = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
 CISCO_MCP_URL     = os.getenv("CISCO_MCP_URL", "http://localhost:8001/mcp")
-HEXSTRIKE_MCP_URL = os.getenv("HEXSTRIKE_MCP_URL", "http://localhost:8000/mcp")
+FORWARD_MCP_URL = os.getenv("FORWARD_MCP_URL", "http://localhost:8000/mcp")
+GRAPH_MCP_URL = os.getenv("GRAPH_MCP_URL", "http://localhost:8003/mcp")
 TARGET_WEBSITE    = os.getenv("TARGET_WEBSITE", "http://localhost:5000")
 
 logging.basicConfig(level=logging.WARNING)
@@ -39,9 +40,9 @@ async def load_all_tools():
     global _tools_cache, _tools_loaded
     tools = []
 
-    # HexStrike tools
+    # FORWARD tools
     try:
-        async with streamablehttp_client(HEXSTRIKE_MCP_URL) as (r, w, _):
+        async with streamablehttp_client(FORWARD_MCP_URL) as (r, w, _):
             async with ClientSession(r, w) as session:
                 await session.initialize()
                 result = await session.list_tools()
@@ -49,14 +50,14 @@ async def load_all_tools():
                     tools.append({
                         "type": "function",
                         "function": {
-                            "name": f"hexstrike__{t.name}",
-                            "description": f"[HexStrike Security Tool] {t.description or ''}",
+                            "name": f"forward__{t.name}",
+                            "description": f"[FORWARD Security Tool] {t.description or ''}",
                             "parameters": t.inputSchema or {"type": "object", "properties": {}}
                         }
                     })
-        print(f"[Server] Loaded {len(tools)} HexStrike tools")
+        print(f"[Server] Loaded {len(tools)} FORWARD tools")
     except Exception as e:
-        print(f"[Server] HexStrike MCP not available: {e}")
+        print(f"[Server] FORWARD MCP not available: {e}")
 
     # Cisco tools
     cisco_start = len(tools)
@@ -77,7 +78,26 @@ async def load_all_tools():
         print(f"[Server] Loaded {len(tools) - cisco_start} Cisco tools")
     except Exception as e:
         print(f"[Server] Cisco MCP not available: {e}")
-
+    
+    graph_start = len(tools)
+    try:
+        async with streamablehttp_client(GRAPH_MCP_URL) as (r, w, _):
+            async with ClientSession(r, w) as session:
+                await session.initialize()
+                result = await session.list_tools()
+                for t in result.tools:
+                    tools.append({
+                        "type": "function",
+                        "function": {
+                            "name": f"{t.name}",
+                            "description": f"[Graph Tool] {t.description or ''}",
+                            "parameters": t.inputSchema or {"type": "object", "properties": {}}
+                        }
+                    })
+        print(f"[Server] Loaded {len(tools) - graph_start} Graph tools")
+    except Exception as e:
+        print(f"[Server] Graph MCP not available: {e}")
+    #print(f"[Server] List of MCP Tools: :{graph_start}, tools:{tools}")
     _tools_cache = tools
     _tools_loaded = True
     return tools
@@ -85,10 +105,10 @@ async def load_all_tools():
 
 async def call_tool(tool_name: str, tool_args: dict) -> str:
     """Route tool call to the correct MCP server."""
-    if tool_name.startswith("hexstrike__"):
-        actual = tool_name.replace("hexstrike__", "")
+    if tool_name.startswith("forward__"):
+        actual = tool_name.replace("forward__", "")
         try:
-            async with streamablehttp_client(HEXSTRIKE_MCP_URL) as (r, w, _):
+            async with streamablehttp_client(FORWARD_MCP_URL) as (r, w, _):
                 async with ClientSession(r, w) as session:
                     await session.initialize()
                     result = await session.call_tool(actual, tool_args)
@@ -157,7 +177,7 @@ async def stream_chat(messages: list, tools: list):
                     tool_args = {}
 
                 # Emit tool call event
-                display_name = tool_name.replace("hexstrike__", "").replace("cisco__", "")
+                display_name = tool_name.replace("forward__", "").replace("cisco__", "")
                 yield f"data: {json.dumps({'type': 'tool_call', 'name': display_name, 'args': tool_args})}\n\n"
 
                 # Execute tool
@@ -201,9 +221,9 @@ def chat():
 
     system_prompt = f"""You are a unified network security assistant with two capabilities:
 
-1. **HexStrike Security Scanner** — scan websites for vulnerabilities using tools like nmap, nikto, nuclei, gobuster, sqlmap etc.
+1. **FORWARD Security Scanner** — scan websites for vulnerabilities using tools like nmap, nikto, nuclei, gobuster, sqlmap etc.
    - The local website to scan is: {TARGET_WEBSITE}
-   - When asked to scan, test, or check vulnerabilities on a website, use HexStrike tools
+   - When asked to scan, test, or check vulnerabilities on a website, use FORWARD tools
    - Always start with server_health to check available tools
    - Use analyze_target_intelligence or nmap_scan as starting points
 

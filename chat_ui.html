@@ -1,32 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NetSec Assistant</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;700;800&display=swap"
+    rel="stylesheet">
   <style>
     :root {
-      --bg:        #0a0c0f;
-      --bg2:       #0f1215;
-      --bg3:       #151a1f;
-      --border:    #1e2530;
-      --accent:    #00e5ff;
-      --accent2:   #ff3d71;
-      --green:     #00ff87;
-      --orange:    #ff9500;
-      --text:      #c8d6e5;
-      --text-dim:  #4a5568;
-      --cisco:     #1a9fff;
+      --bg: #0a0c0f;
+      --bg2: #0f1215;
+      --bg3: #151a1f;
+      --border: #1e2530;
+      --accent: #00e5ff;
+      --accent2: #ff3d71;
+      --green: #00ff87;
+      --orange: #ff9500;
+      --text: #c8d6e5;
+      --text-dim: #4a5568;
+      --cisco: #1a9fff;
       --forward: #ff3d71;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       font-family: 'JetBrains Mono', monospace;
       background: var(--bg);
-      color:white;
+      color: white;
       height: 100vh;
       display: flex;
       flex-direction: column;
@@ -52,13 +59,15 @@
       color: #fff;
     }
 
-    .logo span { color: var(--accent); }
+    .logo span {
+      color: var(--accent);
+    }
 
     .status-bar {
       display: flex;
       gap: 16px;
       font-size: 0.7rem;
-     color : white;
+      color: white;
     }
 
     .status-item {
@@ -74,8 +83,14 @@
       background: var(--text-dim);
     }
 
-    .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
-    .dot.offline { background: var(--accent2); }
+    .dot.online {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    .dot.offline {
+      background: var(--accent2);
+    }
 
     /* ── Suggestions ── */
     .suggestions {
@@ -89,7 +104,9 @@
       scrollbar-width: none;
     }
 
-    .suggestions::-webkit-scrollbar { display: none; }
+    .suggestions::-webkit-scrollbar {
+      display: none;
+    }
 
     .suggestion {
       white-space: nowrap;
@@ -110,10 +127,25 @@
       background: rgba(0, 229, 255, 0.05);
     }
 
-    .suggestion.cisco { border-color: rgba(26,159,255,0.3); }
-    .suggestion.cisco:hover { border-color: var(--cisco); color: var(--cisco); background: rgba(26,159,255,0.05); }
-    .suggestion.hex { border-color: rgba(255,61,113,0.3); }
-    .suggestion.hex:hover { border-color: var(--forward); color: var(--forward); background: rgba(255,61,113,0.05); }
+    .suggestion.cisco {
+      border-color: rgba(26, 159, 255, 0.3);
+    }
+
+    .suggestion.cisco:hover {
+      border-color: var(--cisco);
+      color: var(--cisco);
+      background: rgba(26, 159, 255, 0.05);
+    }
+
+    .suggestion.hex {
+      border-color: rgba(255, 61, 113, 0.3);
+    }
+
+    .suggestion.hex:hover {
+      border-color: var(--forward);
+      color: var(--forward);
+      background: rgba(255, 61, 113, 0.05);
+    }
 
     /* ── Messages ── */
     #messages {
@@ -127,9 +159,18 @@
       scroll-behavior: smooth;
     }
 
-    #messages::-webkit-scrollbar { width: 4px; }
-    #messages::-webkit-scrollbar-track { background: transparent; }
-    #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    #messages::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #messages::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #messages::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
 
     .msg-row {
       display: flex;
@@ -139,11 +180,20 @@
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
-    .msg-row.user { flex-direction: row-reverse; }
+    .msg-row.user {
+      flex-direction: row-reverse;
+    }
 
     .avatar {
       width: 28px;
@@ -158,8 +208,16 @@
       font-family: 'Syne', sans-serif;
     }
 
-    .avatar.user-av { background: var(--accent); color: #000; }
-    .avatar.ai-av   { background: var(--bg3); border: 1px solid var(--border); color: var(--accent); }
+    .avatar.user-av {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .avatar.ai-av {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--accent);
+    }
 
     .bubble {
       max-width: 75%;
@@ -184,7 +242,7 @@
     }
 
     .bubble.typing {
-     color : white;
+      color: white;
       font-style: italic;
     }
 
@@ -194,8 +252,15 @@
     }
 
     @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0; }
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0;
+      }
     }
 
     /* ── Tool call / result ── */
@@ -215,13 +280,22 @@
       font-weight: 500;
     }
 
-    .tool-header.call   { background: rgba(255,149,0,0.08); color: var(--orange); border-bottom: 1px solid rgba(255,149,0,0.2); }
-    .tool-header.result { background: rgba(0,255,135,0.06); color: var(--green);  border-bottom: 1px solid rgba(0,255,135,0.15); }
+    .tool-header.call {
+      background: rgba(255, 149, 0, 0.08);
+      color: var(--orange);
+      border-bottom: 1px solid rgba(255, 149, 0, 0.2);
+    }
+
+    .tool-header.result {
+      background: rgba(0, 255, 135, 0.06);
+      color: var(--green);
+      border-bottom: 1px solid rgba(0, 255, 135, 0.15);
+    }
 
     .tool-body {
       padding: 10px 12px;
       background: var(--bg);
-     color : white;
+      color: white;
       max-height: 300px;
       overflow-y: auto;
       white-space: pre-wrap;
@@ -230,8 +304,13 @@
       line-height: 1.6;
     }
 
-    .tool-body::-webkit-scrollbar { width: 3px; }
-    .tool-body::-webkit-scrollbar-thumb { background: var(--border); }
+    .tool-body::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    .tool-body::-webkit-scrollbar-thumb {
+      background: var(--border);
+    }
 
     /* ── Input ── */
     #input-area {
@@ -254,7 +333,7 @@
 
     .input-wrap:focus-within {
       border-color: var(--accent);
-      box-shadow: 0 0 0 2px rgba(0,229,255,0.08);
+      box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.08);
     }
 
     #input {
@@ -270,7 +349,9 @@
       line-height: 1.5;
     }
 
-    #input::placeholder {color : white; }
+    #input::placeholder {
+      color: white;
+    }
 
     #send {
       background: var(--accent);
@@ -288,12 +369,20 @@
       font-size: 1rem;
     }
 
-    #send:hover   { background: #33ecff; transform: scale(1.05); }
-    #send:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+    #send:hover {
+      background: #33ecff;
+      transform: scale(1.05);
+    }
+
+    #send:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      transform: none;
+    }
 
     .hint {
       font-size: 0.65rem;
-     color : white;
+      color: white;
       margin-top: 8px;
       text-align: center;
     }
@@ -308,234 +397,328 @@
       font-family: 'Syne', sans-serif;
     }
 
-    .tag.cisco   { background: rgba(26,159,255,0.15); color: var(--cisco); }
-    .tag.hex     { background: rgba(255,61,113,0.15); color: var(--forward); }
+    .tag.cisco {
+      background: rgba(26, 159, 255, 0.15);
+      color: var(--cisco);
+    }
+
+    .tag.hex {
+      background: rgba(255, 61, 113, 0.15);
+      color: var(--forward);
+    }
   </style>
 </head>
+
 <body>
 
-<header>
-  <div class="logo">Net<span>Sec</span> Assistant</div>
-  <div class="status-bar">
-    <div class="status-item">
-      <div class="dot online" id="dot-forward"></div>
-      <span id="label-forward">forward</span>
+  <header>
+    <div class="logo">Net<span>Sec</span> Assistant</div>
+    <div class="status-bar">
+      <div class="status-item">
+        <div class="dot online" id="dot-forward"></div>
+        <span id="label-forward">forward</span>
+      </div>
+      <div class="status-item">
+        <div class="dot online" id="dot-cisco"></div>
+        <span id="label-cisco">Cisco</span>
+      </div>
+      <div class="status-item">
+        <div class="dot online" id="dot-ollama"></div>
+        <span>Ollama</span>
+      </div>
     </div>
-    <div class="status-item">
-      <div class="dot online" id="dot-cisco"></div>
-      <span id="label-cisco">Cisco</span>
-    </div>
-    <div class="status-item">
-      <div class="dot online" id="dot-ollama"></div>
-      <span>Ollama</span>
-    </div>
-  </div>
-</header>
+  </header>
 
-<div class="suggestions">
-  <!-- <button class="suggestion hex" onclick="send('Scan localhost:5000 for vulnerabilities')">🔍 Scan local website</button>
+  <div class="suggestions">
+    <!-- <button class="suggestion hex" onclick="send('Scan localhost:5000 for vulnerabilities')">🔍 Scan local website</button>
   <button class="suggestion hex" onclick="send('Run nmap scan on localhost:5000')">📡 Nmap scan</button>
   <button class="suggestion hex" onclick="send('Check server health and available tools')">🏥 forward health</button>
   <button class="suggestion hex" onclick="send('Run nikto scan on http://localhost:5000')">🔬 Nikto scan</button> -->
-  <button class="suggestion cisco" onclick="send('Show interfaces status on the switch')">🔌 Interfaces status</button>
-  <button class="suggestion cisco" onclick="send('Show VLAN brief on the switch')">🗂️ VLANs</button>
-  <button class="suggestion cisco" onclick="send('Show MAC address table')">📋 MAC table</button>
-  <button class="suggestion cisco" onclick="send('Show CDP neighbors')">🔗 CDP neighbors</button>
-  <button class="suggestion cisco" onclick="send('Show version on the switch')">ℹ️ Switch version</button>
-</div>
-
-<div id="messages">
-  <div class="msg-row">
-    <div class="avatar ai-av">AI</div>
-    <div class="bubble assistant">Hello! I'm your unified network security assistant.
-
-I can help you with two things:
-
-<span class="tag hex">forward</span> Scan your local website at <strong>localhost:5000</strong> for vulnerabilities using tools like nmap, nikto, nuclei, gobuster and more.
-
-<span class="tag cisco">Cisco</span> Query your Cisco C2960CX switch — show interfaces, VLANs, MAC table, ARP, spanning tree, and more.
-
-Just ask naturally — I'll figure out which tool to use. Try the quick actions above to get started!</div>
+    <button class="suggestion cisco" onclick="send('Show interfaces status on the switch')">🔌 Interfaces
+      status</button>
+    <button class="suggestion cisco" onclick="send('Show VLAN brief on the switch')">🗂️ VLANs</button>
+    <button class="suggestion cisco" onclick="send('Show MAC address table')">📋 MAC table</button>
+    <button class="suggestion cisco" onclick="send('Show CDP neighbors')">🔗 CDP neighbors</button>
+    <button class="suggestion cisco" onclick="send('Show version on the switch')">ℹ️ Switch version</button>
   </div>
-</div>
 
-<div id="input-area">
-  <div class="input-wrap">
-    <textarea id="input" rows="1" placeholder="Ask me to scan localhost:5000 or query the switch..."></textarea>
-    <button id="send" onclick="sendMessage()">↑</button>
+  <div id="messages">
+    <div class="msg-row">
+      <div class="avatar ai-av">AI</div>
+      <div class="bubble assistant">Hello! I'm your unified network security assistant.
+
+        I can help you with two things:
+
+        <span class="tag hex">forward</span> Scan your local website at <strong>localhost:5000</strong> for
+        vulnerabilities using tools like nmap, nikto, nuclei, gobuster and more.
+
+        <span class="tag cisco">Cisco</span> Query your Cisco C2960CX switch — show interfaces, VLANs, MAC table, ARP,
+        spanning tree, and more.
+
+        Just ask naturally — I'll figure out which tool to use. Try the quick actions above to get started!
+      </div>
+    </div>
   </div>
-  <div class="hint">Enter to send · Shift+Enter for new line</div>
-</div>
 
-<script>
-  const BASE = window.location.pathname.startsWith('/netsec') ? '/netsec' : '';
-  const messagesEl = document.getElementById("messages");
-  const inputEl    = document.getElementById("input");
-  const sendBtn    = document.getElementById("send");
-  let history      = [];
-  let busy         = false;
+  <div id="input-area">
+    <div class="input-wrap">
+      <textarea id="input" rows="1" placeholder="Ask me to scan localhost:5000 or query the switch..."></textarea>
+      <button id="send" onclick="sendMessage()">↑</button>
+    </div>
+    <div class="hint">Enter to send · Shift+Enter for new line</div>
+  </div>
 
-  // ── Auto-resize textarea ──────────────────────────────────────────────────
-  inputEl.addEventListener("input", () => {
-    inputEl.style.height = "auto";
-    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
-  });
+  <script>
+    const BASE = window.location.pathname.startsWith('/netsec') ? '/netsec' : '';
+    const messagesEl = document.getElementById("messages");
+    const inputEl = document.getElementById("input");
+    const sendBtn = document.getElementById("send");
+    let history = [];
+    let busy = false;
 
-  inputEl.addEventListener("keydown", e => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  });
+    // ── Auto-resize textarea ──────────────────────────────────────────────────
+    inputEl.addEventListener("input", () => {
+      inputEl.style.height = "auto";
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+    });
 
-  // ── Check tool status ─────────────────────────────────────────────────────
-  async function checkStatus() {
-    try {
-      const r = await fetch("/tools");
-      const d = await r.json();
-      const hasForward    = d.tools.some(t => t.startsWith("hexstrike__"));
-      const hasCisco  = d.tools.some(t => t.startsWith("cisco__"));
-      document.getElementById("dot-forward").className = "dot " + (hasForward   ? "online" : "offline");
-      document.getElementById("dot-cisco").className     = "dot " + (hasCisco ? "online" : "offline");
-    } catch {}
-  }
-  checkStatus();
+    inputEl.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
 
-  // ── Scroll ────────────────────────────────────────────────────────────────
-  function scrollBottom() {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
+    // ── Check tool status ─────────────────────────────────────────────────────
+    async function checkStatus() {
+      try {
+        const r = await fetch(`${BASE}/tools`);
+        const d = await r.json();
+        const hasForward = d.tools.some(t => t.startsWith("forward__"));
+        const hasCisco = d.tools.some(t => t.startsWith("cisco__"));
+        document.getElementById("dot-forward").className = "dot " + (hasForward ? "online" : "offline");
+        document.getElementById("dot-cisco").className = "dot " + (hasCisco ? "online" : "offline");
+      } catch { }
+    }
+    checkStatus();
 
-  // ── Add message bubble ────────────────────────────────────────────────────
-  function addBubble(role, text, cls = "") {
-    const row = document.createElement("div");
-    row.className = "msg-row" + (role === "user" ? " user" : "");
-
-    const av  = document.createElement("div");
-    av.className = role === "user" ? "avatar user-av" : "avatar ai-av";
-    av.textContent = role === "user" ? "YOU" : "AI";
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble " + role + (cls ? " " + cls : "");
-    if (text) bubble.textContent = text;
-
-    row.appendChild(av);
-    row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    scrollBottom();
-    return bubble;
-  }
-
-  // ── Add tool block ────────────────────────────────────────────────────────
-  function addToolBlock(type, name, content) {
-    const row = document.createElement("div");
-    row.className = "msg-row";
-
-    const spacer = document.createElement("div");
-    spacer.style.width = "40px";
-
-    const block = document.createElement("div");
-    block.className = "tool-block";
-
-    const header = document.createElement("div");
-    header.className = "tool-header " + type;
-    header.innerHTML = type === "call"
-      ? `⚙️ <strong>${name}</strong>`
-      : `✅ <strong>${name}</strong>`;
-
-    const body = document.createElement("div");
-    body.className = "tool-body";
-
-    // Pretty print if JSON
-    try {
-      const parsed = JSON.parse(content);
-      body.textContent = JSON.stringify(parsed, null, 2);
-    } catch {
-      body.textContent = content;
+    // ── Scroll ────────────────────────────────────────────────────────────────
+    function scrollBottom() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    block.appendChild(header);
-    block.appendChild(body);
-    row.appendChild(spacer);
-    row.appendChild(block);
-    messagesEl.appendChild(row);
-    scrollBottom();
-  }
+    // ── Add message bubble ────────────────────────────────────────────────────
+    function addBubble(role, text, cls = "") {
+      const row = document.createElement("div");
+      row.className = "msg-row" + (role === "user" ? " user" : "");
 
-  // ── Send ──────────────────────────────────────────────────────────────────
-  function send(text) {
-    inputEl.value = text;
-    sendMessage();
-  }
+      const av = document.createElement("div");
+      av.className = role === "user" ? "avatar user-av" : "avatar ai-av";
+      av.textContent = role === "user" ? "YOU" : "AI";
 
-  async function sendMessage() {
-    if (busy) return;
-    const text = inputEl.value.trim();
-    if (!text) return;
+      const bubble = document.createElement("div");
+      bubble.className = "bubble " + role + (cls ? " " + cls : "");
+      if (text) bubble.textContent = text;
 
-    inputEl.value = "";
-    inputEl.style.height = "auto";
-    busy = true;
-    sendBtn.disabled = true;
+      row.appendChild(av);
+      row.appendChild(bubble);
+      messagesEl.appendChild(row);
+      scrollBottom();
+      return bubble;
+    }
 
-    addBubble("user", text);
-    history.push({ role: "user", content: text });
+    // ── Add tool block ────────────────────────────────────────────────────────
+    function addToolBlock(type, name, content) {
+      const row = document.createElement("div");
+      row.className = "msg-row";
 
-    const aiBubble = addBubble("assistant", "", "typing");
+      const spacer = document.createElement("div");
+      spacer.style.width = "40px";
 
-    try {
-      const res = await fetch("/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history: history.slice(0, -1) })
-      });
+      const block = document.createElement("div");
+      block.className = "tool-block";
 
-      const reader  = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer    = "";
-      let fullText  = "";
-      let firstText = true;
+      const header = document.createElement("div");
+      header.className = "tool-header " + type;
+      header.innerHTML = type === "call"
+        ? `⚙️ <strong>${name}</strong>`
+        : `✅ <strong>${name}</strong>`;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const body = document.createElement("div");
+      body.className = "tool-body";
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = JSON.parse(line.slice(6));
-
-          if (data.type === "text") {
-            if (firstText) {
-              aiBubble.classList.remove("typing");
-              firstText = false;
-            }
-            fullText += data.content;
-            aiBubble.textContent = fullText;
-            scrollBottom();
-
-          } else if (data.type === "tool_call") {
-            addToolBlock("call", data.name, JSON.stringify(data.args, null, 2));
-
-          } else if (data.type === "tool_result") {
-            addToolBlock("result", data.name, data.result);
-
-          } else if (data.type === "done") {
-            aiBubble.classList.remove("typing");
-            if (fullText) history.push({ role: "assistant", content: fullText });
-          }
-        }
+      // Pretty print if JSON
+      try {
+        const parsed = JSON.parse(content);
+        body.textContent = JSON.stringify(parsed, null, 2);
+      } catch {
+        body.textContent = content;
       }
 
-    } catch (err) {
-      aiBubble.classList.remove("typing");
-      aiBubble.textContent = `Error: ${err.message}`;
+      block.appendChild(header);
+      block.appendChild(body);
+      row.appendChild(spacer);
+      row.appendChild(block);
+      messagesEl.appendChild(row);
+      scrollBottom();
     }
 
-    busy = false;
-    sendBtn.disabled = false;
-    inputEl.focus();
-  }
-</script>
+    // ── Send ──────────────────────────────────────────────────────────────────
+    function send(text) {
+      inputEl.value = text;
+      sendMessage();
+    }
+    async function mcpCall(method, params = {}) {
+      const res = await fetch(MCP_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method,
+          params,
+        }),
+      });
+
+      const contentType = res.headers.get("content-type") ?? "";
+
+      // ── JSON response ─────────────────────────────────────────────
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        showRaw(data);
+        if (data.error) throw new Error(data.error.message);
+        return data.result;
+      }
+
+      // ── SSE response — collect ALL events, return last result ─────
+      if (contentType.includes("text/event-stream")) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let lastResult = null;
+        const allEvents = [];
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop(); // keep incomplete line
+
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+            const jsonStr = line.slice(5).trim();
+            if (!jsonStr || jsonStr === "[DONE]") continue;
+
+            try {
+              const event = JSON.parse(jsonStr);
+              allEvents.push(event);
+
+              // MCP result event
+              if (event.id && event.result !== undefined) {
+                lastResult = event.result;
+              }
+              // MCP error event
+              if (event.error) {
+                throw new Error(event.error.message);
+              }
+            } catch (e) {
+              if (e.message !== "JSON parse error") console.warn("SSE parse:", jsonStr);
+            }
+          }
+        }
+
+        showRaw(allEvents);
+        if (!lastResult) throw new Error("No result received from SSE stream");
+        return lastResult;
+      }
+
+      throw new Error(`Unsupported Content-Type: ${contentType}`);
+    }
+    async function listTools() {
+      try {
+
+        const result = await mcpCall("tools/list");
+        availableTools = result.tools ?? [];
+
+
+      } catch (err) {
+        setStatus(`❌ ${err.message}`, "error");
+      }
+    }
+    async function sendMessage() {
+      if (busy) return;
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      inputEl.value = "";
+      inputEl.style.height = "auto";
+      busy = true;
+      sendBtn.disabled = true;
+
+      addBubble("user", text);
+      history.push({ role: "user", content: text });
+
+      const aiBubble = addBubble("assistant", "", "typing");
+
+      try {
+        const res = await fetch(`${BASE}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, history: history.slice(0, -1) })
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let fullText = "";
+        let firstText = true;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === "text") {
+              if (firstText) {
+                aiBubble.classList.remove("typing");
+                firstText = false;
+              }
+              fullText += data.content;
+              aiBubble.textContent = fullText;
+              scrollBottom();
+
+            } else if (data.type === "tool_call") {
+              addToolBlock("call", data.name, JSON.stringify(data.args, null, 2));
+
+            } else if (data.type === "tool_result") {
+              addToolBlock("result", data.name, data.result);
+
+            } else if (data.type === "done") {
+              aiBubble.classList.remove("typing");
+              if (fullText) history.push({ role: "assistant", content: fullText });
+            }
+          }
+        }
+
+      } catch (err) {
+        aiBubble.classList.remove("typing");
+        aiBubble.textContent = `Error: ${err.message}`;
+      }
+
+      busy = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  </script>
 </body>
+
 </html>
