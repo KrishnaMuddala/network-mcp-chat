@@ -18,8 +18,8 @@ from mcp.client.streamable_http import streamablehttp_client
 
 load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
-OLLAMA_BASE_URL   = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-OLLAMA_MODEL      = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
+OLLAMA_BASE_URL   = os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:11434/v1")
+OLLAMA_MODEL      = os.getenv("LOCAL_LLM_MODEL", "qwen2.5:7b")
 CISCO_MCP_URL     = os.getenv("CISCO_MCP_URL", "http://localhost:8001/mcp")
 FORWARD_MCP_URL = os.getenv("FORWARD_MCP_URL", "http://localhost:8000/mcp")
 GRAPH_MCP_URL = os.getenv("GRAPH_MCP_URL", "http://localhost:8003/mcp")
@@ -219,20 +219,39 @@ def chat():
     user_message = data.get("message", "")
     history = data.get("history", [])
 
-    system_prompt = f"""You are a unified network security assistant with two capabilities:
+    system_prompt = f"""You are a network operations assistant with access to two tool groups.
 
-1. **FORWARD Security Scanner** — scan websites for vulnerabilities using tools like nmap, nikto, nuclei, gobuster, sqlmap etc.
-   - The local website to scan is: {TARGET_WEBSITE}
-   - When asked to scan, test, or check vulnerabilities on a website, use FORWARD tools
-   - Always start with server_health to check available tools
-   - Use analyze_target_intelligence or nmap_scan as starting points
+═══════════════════════════════════════
+FORWARD NETWORKS TOOLS
+═══════════════════════════════════════
+Use for: network topology, device inventory, hardware EOL, path tracing, compliance.
 
-2. **Cisco Switch** — query the Cisco C2960CX switch using read-only show commands
-   - When asked about interfaces, VLANs, MAC tables, ARP, spanning tree etc., use Cisco tools
-   - Use cisco_list_commands first if unsure what commands are available
+Rules:
+1. ALWAYS call list_networks FIRST to get a valid network_id — never guess or invent one
+2. For device inventory → get_device_basic_info(network_id, output_format)
+3. For hardware EOL/lifecycle → get_hardware_support(network_id, output_format)
+4. For path tracing → search_paths(network_id, dst_ip, src_ip, output_format)
+5. For graphs/diagrams/visuals → pass output_format='graph' directly on the data tool above
+   Example: get_device_basic_info(network_id='123', output_format='graph')
+   Do NOT call generate_graph with a text description — it requires real JSON data only
 
-Always explain what you are doing and present results clearly.
-When scanning the local website, use {TARGET_WEBSITE} as the target automatically — don't ask the user for it."""
+═══════════════════════════════════════
+CISCO SWITCH TOOLS
+═══════════════════════════════════════
+Use for: interfaces, VLANs, MAC tables, ARP, spanning tree, switch config.
+
+Rules:
+1. If unsure which command to use, call cisco_list_commands first
+2. Use cisco_show(host, command) for all switch queries
+3. Only read-only show commands are supported — write commands will be rejected
+
+═══════════════════════════════════════
+GENERAL RULES
+═══════════════════════════════════════
+- Use the EXACT tool name as listed in your available tools — never modify or guess names
+- Pick ONE tool group based on what the user is asking about
+- Never call a tool from the wrong group (e.g. don't use Cisco tools for Forward Networks questions)
+- Always explain your results in plain language after the tool call completes"""
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)

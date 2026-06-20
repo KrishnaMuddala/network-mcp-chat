@@ -489,7 +489,7 @@
     // ── Check tool status ─────────────────────────────────────────────────────
     async function checkStatus() {
       try {
-        const r = await fetch(`${BASE}/tools`);
+        const r = await fetch(`/tools`);
         const d = await r.json();
         const hasForward = d.tools.some(t => t.startsWith("forward__"));
         const hasCisco = d.tools.some(t => t.startsWith("cisco__"));
@@ -565,88 +565,7 @@
       inputEl.value = text;
       sendMessage();
     }
-    async function mcpCall(method, params = {}) {
-      const res = await fetch(MCP_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json, text/event-stream",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: Date.now(),
-          method,
-          params,
-        }),
-      });
-
-      const contentType = res.headers.get("content-type") ?? "";
-
-      // ── JSON response ─────────────────────────────────────────────
-      if (contentType.includes("application/json")) {
-        const data = await res.json();
-        showRaw(data);
-        if (data.error) throw new Error(data.error.message);
-        return data.result;
-      }
-
-      // ── SSE response — collect ALL events, return last result ─────
-      if (contentType.includes("text/event-stream")) {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
-        let lastResult = null;
-        const allEvents = [];
-
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop(); // keep incomplete line
-
-          for (const line of lines) {
-            if (!line.startsWith("data:")) continue;
-            const jsonStr = line.slice(5).trim();
-            if (!jsonStr || jsonStr === "[DONE]") continue;
-
-            try {
-              const event = JSON.parse(jsonStr);
-              allEvents.push(event);
-
-              // MCP result event
-              if (event.id && event.result !== undefined) {
-                lastResult = event.result;
-              }
-              // MCP error event
-              if (event.error) {
-                throw new Error(event.error.message);
-              }
-            } catch (e) {
-              if (e.message !== "JSON parse error") console.warn("SSE parse:", jsonStr);
-            }
-          }
-        }
-
-        showRaw(allEvents);
-        if (!lastResult) throw new Error("No result received from SSE stream");
-        return lastResult;
-      }
-
-      throw new Error(`Unsupported Content-Type: ${contentType}`);
-    }
-    async function listTools() {
-      try {
-
-        const result = await mcpCall("tools/list");
-        availableTools = result.tools ?? [];
-
-
-      } catch (err) {
-        setStatus(`❌ ${err.message}`, "error");
-      }
-    }
+   
     async function sendMessage() {
       if (busy) return;
       const text = inputEl.value.trim();
@@ -663,7 +582,7 @@
       const aiBubble = addBubble("assistant", "", "typing");
 
       try {
-        const res = await fetch(`${BASE}/chat`, {
+        const res = await fetch(`/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text, history: history.slice(0, -1) })

@@ -11,9 +11,12 @@ if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 import session from 'express-session';
 import bcrypt from 'bcryptjs';
 import { readFileSync } from 'fs';
-
 const users = JSON.parse(readFileSync('./users.json', 'utf-8'));
-
+import path from 'path';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 dotenv.config();
 
@@ -27,7 +30,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     secure: false,        // set true when behind HTTPS/nginx
-    maxAge: 8 * 60 * 60 * 1000  // 8 hour session
+    maxAge: 8 * 60 * 60 * 1000  // 8 hour  session
   }
 }));
 
@@ -51,6 +54,12 @@ app.post('/login', express.urlencoded({ extended: true }), (req, res) => {
   }
   return res.redirect('/login.html?error=1');
 });
+
+
+app.get("/graph-test", (req, res) => {
+  res.sendFile(path.join(__dirname, "graph_test.html"));
+});
+
 
 app.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login.html'));
@@ -94,9 +103,35 @@ class MCPClient {
   }
 }
 
-const mcpClient = new MCPClient(process.env.MCP_SERVER_URL ?? "http://localhost:8000/mcp");
-await mcpClient.connect();
-console.log("✅ Connected to MCP server");
+const forwardClient = new MCPClient(process.env.FORWARD_MCP_URL ?? "http://localhost:8000/mcp");
+const ciscoClient = new MCPClient(
+  process.env.CISCO_MCP_URL ?? "http://localhost:8001/mcp"
+);
+await forwardClient.connect();
+await ciscoClient.connect();
+
+const forwardTools = await forwardClient.listTools();
+const ciscoTools   = await ciscoClient.listTools();
+const mcpTools = [...forwardTools, ...ciscoTools];
+
+// ── Tool name → client lookup map ───────────────────────────────────────
+// This fixes "Unknown tool" errors — without this map, ALL tool calls
+// were being sent to forwardClient even when the tool belongs to ciscoClient.
+const toolClientMap = {};
+for (const t of forwardTools) toolClientMap[t.name] = forwardClient;
+for (const t of ciscoTools)   toolClientMap[t.name] = ciscoClient;
+
+function getClientForTool(toolName) {
+  const client = toolClientMap[toolName];
+  if (!client) {
+    throw new Error(`No MCP client registered for tool: ${toolName}`);
+  }
+  return client;
+}
+
+console.log(`✅ Connected to MCP servers with tools: ${mcpTools.map(t => t.name).join(", ")}`);
+console.log(`   Forward Networks tools: ${forwardTools.map(t => t.name).join(", ")}`);
+console.log(`   Cisco tools: ${ciscoTools.map(t => t.name).join(", ")}`);
 
 const LLM_BASE_URL = process.env.LOCAL_LLM_BASE_URL ?? "http://localhost:11434/v1";
 
@@ -106,12 +141,13 @@ const openai = new OpenAI({
 });
 
 // ── Dynamic model selection ───────────────────────────────────────────────
-let currentModel = process.env.LLM_MODEL ?? "qwen2.5:7b";
+let currentModel = process.env.LOCAL_LLM_MODEL ?? "qwen2.5:7b";
 
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 console.log("🤖 LLM Model     :", currentModel);
 console.log("🌐 LLM Base URL  :", LLM_BASE_URL);
-console.log("🔌 MCP Server    :", process.env.MCP_SERVER_URL ?? "http://localhost:8000/mcp");
+console.log("🔌 Forward MCP   :", process.env.FORWARD_MCP_URL ?? "http://localhost:8000/mcp");
+console.log("🔌 Cisco MCP     :", process.env.CISCO_MCP_URL ?? "http://localhost:8001/mcp");
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
 // Conversation history per session (simple in-memory)
@@ -144,17 +180,41 @@ app.post("/model", (req, res) => {
 
 // ── System prompt ─────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a network intelligence agent with access to Forward Networks tools.
+const SYSTEM_PROMPT = `You are a network operations assistant with access to two tool groups.
 
-IMPORTANT RULES:
-- To show data as a graph, call the data tool directly with output_format='graph'
-  Example: get_device_basic_info(network_id='123', output_format='graph')
-- Do NOT call generate_graph with a query string — it needs real JSON data
-- Always call list_networks first to get a valid network_id before any other tool
-- Never invent or guess network IDs — always look them up first
-- For device inventory queries, use get_device_basic_info with the real network_id
-- For hardware EOL queries, use get_hardware_support with the real network_id
+═══════════════════════════════════════
+FORWARD NETWORKS TOOLS
+═══════════════════════════════════════
+Use for: network topology, device inventory, hardware EOL, path tracing, compliance.
+
+Rules:
+1. ALWAYS call list_networks FIRST to get a valid network_id — never guess or invent one
+2. For device inventory → get_device_basic_info(network_id, output_format)
+3. For hardware EOL/lifecycle → get_hardware_support(network_id, output_format)
+4. For path tracing → search_paths(network_id, dst_ip, src_ip, output_format)
+5. For graphs/diagrams/visuals → pass output_format='graph' directly on the data tool above
+   Example: get_device_basic_info(network_id='123', output_format='graph')
+   Do NOT call generate_graph with a text description — it requires real JSON data only
+
+═══════════════════════════════════════
+CISCO SWITCH TOOLS
+═══════════════════════════════════════
+Use for: interfaces, VLANs, MAC tables, ARP, spanning tree, switch config.
+
+Rules:
+1. If unsure which command to use, call cisco_list_commands first
+2. Use cisco_show(host, command) for all switch queries
+3. Only read-only show commands are supported — write commands will be rejected
+
+═══════════════════════════════════════
+GENERAL RULES
+═══════════════════════════════════════
+- Use the EXACT tool name as listed in your available tools — never modify or guess names
+- Pick ONE tool group based on what the user is asking about
+- Never call a tool from the wrong group (e.g. don't use Cisco tools for Forward Networks questions)
+- Always explain your results in plain language after the tool call completes
 `;
+
 
 // ── Chat endpoint (SSE streaming to browser) ──────────────────────────────
 
@@ -176,7 +236,6 @@ app.post("/chat", async (req, res) => {
   // Tell browser which model is being used
   send({ type: "model", model: currentModel });
 
-  const mcpTools = await mcpClient.listTools();
   const tools = mcpTools.map(t => ({
     type: "function",
     function: { name: t.name, description: t.description, parameters: t.inputSchema },
@@ -185,7 +244,7 @@ app.post("/chat", async (req, res) => {
   try {
     while (true) {
       const stream = await openai.chat.completions.create({
-        model: currentModel,   // ← uses dynamic model
+        model: currentModel,
         max_tokens: 8000,
         tools,
         tool_choice: "auto",
@@ -228,10 +287,19 @@ app.post("/chat", async (req, res) => {
 
           for (const tc of Object.values(toolCalls)) {
             send({ type: "tool_call", name: tc.name, args: JSON.parse(tc.args) });
-            const result = await mcpClient.callTool(tc.name, JSON.parse(tc.args));
-            const content = result.content.filter(c => c.type === "text").map(c => c.text);
-            send({ type: "tool_result", name: tc.name, result: content });
-            messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(content) });
+
+            try {
+              // ── FIXED: route to correct MCP client based on tool name ──
+              const client = getClientForTool(tc.name);
+              const result = await client.callTool(tc.name, JSON.parse(tc.args));
+              const content = result.content.filter(c => c.type === "text").map(c => c.text);
+              send({ type: "tool_result", name: tc.name, result: content });
+              messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(content) });
+            } catch (toolErr) {
+              const errMsg = `Tool error: ${toolErr.message}`;
+              send({ type: "tool_result", name: tc.name, result: [errMsg] });
+              messages.push({ role: "tool", tool_call_id: tc.id, content: errMsg });
+            }
           }
 
           toolCalls = {};
@@ -269,7 +337,7 @@ app.post("/command", async (req, res) => {
   const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
   try {
-    const promptMessages = await mcpClient.client.getPrompt({
+    const promptMessages = await forwardClient.client.getPrompt({
       name: command,
       arguments: { doc_id: docId },
     });
@@ -281,7 +349,8 @@ app.post("/command", async (req, res) => {
       });
     }
 
-    const mcpTools = await mcpClient.listTools();
+    // ── FIXED: reuse global mcpTools (has both servers) instead of
+    // refetching from forwardClient only ──
     const tools = mcpTools.map(t => ({
       type: "function",
       function: { name: t.name, description: t.description, parameters: t.inputSchema },
@@ -289,7 +358,7 @@ app.post("/command", async (req, res) => {
 
     while (true) {
       const stream = await openai.chat.completions.create({
-        model: currentModel,   // ← uses dynamic model
+        model: currentModel,
         max_tokens: 8000,
         tools,
         tool_choice: "auto",
@@ -331,10 +400,19 @@ app.post("/command", async (req, res) => {
 
           for (const tc of Object.values(toolCalls)) {
             send({ type: "tool_call", name: tc.name, args: JSON.parse(tc.args) });
-            const result = await mcpClient.callTool(tc.name, JSON.parse(tc.args));
-            const content = result.content.filter(c => c.type === "text").map(c => c.text);
-            send({ type: "tool_result", name: tc.name, result: content });
-            messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(content) });
+
+            try {
+              // ── FIXED: route to correct MCP client based on tool name ──
+              const client = getClientForTool(tc.name);
+              const result = await client.callTool(tc.name, JSON.parse(tc.args));
+              const content = result.content.filter(c => c.type === "text").map(c => c.text);
+              send({ type: "tool_result", name: tc.name, result: content });
+              messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(content) });
+            } catch (toolErr) {
+              const errMsg = `Tool error: ${toolErr.message}`;
+              send({ type: "tool_result", name: tc.name, result: [errMsg] });
+              messages.push({ role: "tool", tool_call_id: tc.id, content: errMsg });
+            }
           }
 
           toolCalls = {};
@@ -359,7 +437,7 @@ app.post("/command", async (req, res) => {
 
 app.get("/resources", async (req, res) => {
   try {
-    const resources = await mcpClient.listResources();
+    const resources = await forwardClient.listResources();
     res.json(resources);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -369,7 +447,7 @@ app.get("/resources", async (req, res) => {
 app.get("/resource", async (req, res) => {
   try {
     const { uri } = req.query;
-    const contents = await mcpClient.readResource(uri);
+    const contents = await forwardClient.readResource(uri);
     res.json(contents);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -410,13 +488,13 @@ function chunkText(text, maxChars = 3000) {
   }
   return chunks;
 }
-const OLLAMA_CHAT_URL = process.env.OLLAMA_CHAT_URL ?? 'http://host.docker.internal:11434/api/chat';
+const LOCAL_LLM_CHAT_URL = process.env.LOCAL_LLM_CHAT_URL ?? 'http://host.docker.internal:11434/api/chat';
 // --- Call Ollama ---
 async function ollamaChat(prompt, timeoutMs = 300000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(OLLAMA_CHAT_URL, {
+    const res = await fetch(LOCAL_LLM_CHAT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

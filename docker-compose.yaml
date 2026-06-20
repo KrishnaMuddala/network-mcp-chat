@@ -8,10 +8,15 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file: .env
+    env_file: .env.docker
     environment:
       - LOCAL_LLM_BASE_URL=http://host.docker.internal:11434/v1
-      - MCP_SERVER_URL=http://mcp-forward:8000/mcp
+      - LOCAL_LLM_CHAT_URL=http://host.docker.internal:11434/api/chat
+      - LOCAL_LLM_MODEL=qwen2.5:7b
+      - CISCO_MCP_URL=http://mcp-cisco:8001/mcp
+      - FORWARD_MCP_URL=http://mcp-forward:8000/mcp
+      - HEXSTRIKE_MCP_URL=http://mcp-hexstrike:8002/mcp
+      - TARGET_WEBSITE=http://localhost:5000
     depends_on:
       - mcp-forward
       # - mcp-cisco
@@ -26,20 +31,56 @@ services:
     container_name: mcp-forward
     restart: unless-stopped
     command: ["uv", "run", "mcp_fwdnetworkserver.py"]
-    env_file: .env
+    env_file: .env.docker
     ports:
       - "8000:8000"
 
-  # mcp-cisco:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.python
-  #   container_name: mcp-cisco
-  #   restart: unless-stopped
-  #   command: ["uv", "run", "mcp_cisco_c2960cx_server.py"]
-  #   env_file: .env
-  #   ports:
-  #     - "8001:8001"
-
+  mcp-cisco:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: mcp-cisco
+    restart: unless-stopped
+    command: ["uv", "run", "mcp_cisco_c2960cx_server.py"]
+    env_file: .env.docker
+    ports:
+      - "8001:8001"
+  chat-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: netops-chat-ui
+    restart: unless-stopped
+    command: ["uv", "run", "chat_server.py"]
+    ports:
+      - "9000:9000"
+    env_file: .env.docker
+    environment:
+      - LOCAL_LLM_BASE_URL=http://host.docker.internal:11434/v1
+      - LOCAL_LLM_CHAT_URL=http://host.docker.internal:11434/api/chat
+      - LOCAL_LLM_MODEL=qwen2.5:7b
+      - CISCO_MCP_URL=http://mcp-cisco:8001/mcp
+      - FORWARD_MCP_URL=http://mcp-forward:8000/mcp
+      - HEXSTRIKE_MCP_URL=http://mcp-hexstrike:8002/mcp
+      - TARGET_WEBSITE=http://localhost:5000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - mcp-forward
+      - mcp-cisco
+  nginx:
+    image: nginx:alpine
+    container_name: netops-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./.htpasswd:/etc/nginx/.htpasswd:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - web-ui
+      - chat-ui    # ← added so nginx waits for both services
 volumes:
   uploads:

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Graph Viz MCP Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    h2 {
+      font-size: 1rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 8px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 0.8rem;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #1177bb; }
+    button.secondary {
+      background: #2d2d2d;
+      border: 1px solid #444;
+      color: #ccc;
+    }
+    button.secondary:hover { background: #333; }
+
+    #status {
+      font-size: 0.75rem;
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    #status.ok    { background: #1a3a1a; color: #88cc88; border: 1px solid #3a7a3a; display: block; }
+    #status.error { background: #3a1a1a; color: #cc8888; border: 1px solid #7a3a3a; display: block; }
+    #status.info  { background: #1a2a3a; color: #88aacc; border: 1px solid #3a5a7a; display: block; }
+
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      font-size: 0.72rem;
+      color: #888;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      background: #2d2d2d;
+      border: 1px solid #444;
+      color: #d4d4d4;
+      padding: 10px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      resize: vertical;
+      outline: none;
+      min-height: 180px;
+    }
+    textarea:focus { border-color: #0e639c; }
+
+    select {
+      width: 100%;
+      background: #2d2d2d;
+      border: 1px solid #444;
+      color: #d4d4d4;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      outline: none;
+      margin-bottom: 10px;
+    }
+
+    #result {
+      background: #2d2d2d;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 16px;
+      min-height: 200px;
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: auto;
+    }
+
+    #chart-container {
+      margin-top: 16px;
+      border: 1px solid #444;
+      border-radius: 6px;
+      overflow: hidden;
+      display: none;
+    }
+
+    #chart-container iframe {
+      width: 100%;
+      height: 500px;
+      border: none;
+      background: white;
+    }
+
+    #tools-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .tool-tag {
+      background: #1a3a1a;
+      border: 1px solid #3a7a3a;
+      color: #88cc88;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+    }
+
+    #raw-toggle {
+      font-size: 0.7rem;
+      color: #888;
+      cursor: pointer;
+      margin-top: 8px;
+      display: none;
+    }
+    #raw-toggle:hover { color: #ccc; }
+
+    #raw-output {
+      display: none;
+      margin-top: 8px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 10px;
+      font-size: 0.72rem;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🧪 Graph Visualization MCP — Test UI</h2>
+
+  <div id="status"></div>
+
+  <div class="toolbar">
+    <button onclick="checkHealth()">🏥 Health Check</button>
+    <button onclick="listTools()">🔧 List Tools</button>
+    <button onclick="loadResourceUI()">🖥️ Load Chart UI</button>
+    <button onclick="callTool()">📊 Generate Chart</button>
+    <button class="secondary" onclick="loadSample('bar')">Sample: Bar</button>
+    <button class="secondary" onclick="loadSample('line')">Sample: Line</button>
+    <button class="secondary" onclick="loadSample('pie')">Sample: Pie</button>
+    <button class="secondary" onclick="loadSample('network')">Sample: Network</button>
+  </div>
+
+  <label>Tool Name</label>
+  <select id="tool-name">
+    <option value="create_visualization">create_visualization</option>
+  </select>
+
+  <div id="tools-list"></div>
+
+  <div class="panels">
+    <div>
+      <label>Data (JSON array)</label>
+      <textarea id="data-input">[
+  { "name": "Cisco", "value": 45 },
+  { "name": "Juniper", "value": 23 },
+  { "name": "Arista", "value": 12 },
+  { "name": "Palo Alto", "value": 8 }
+]</textarea>
+    </div>
+    <div>
+      <label>Options (JSON)</label>
+      <textarea id="options-input">{
+  "chartType": "bar",
+  "title": "Devices by Vendor",
+  "xAxis": "name",
+  "yAxis": "value"
+}</textarea>
+    </div>
+  </div>
+
+  <label>Result</label>
+  <div id="result">Click a button to test...</div>
+
+  <!-- Chart renders here separately from raw output -->
+  <div id="chart-container">
+    <iframe id="chart-frame"></iframe>
+  </div>
+
+  <div id="raw-toggle" onclick="toggleRaw()">▶ Show raw response</div>
+  <div id="raw-output"></div>
+
+  <script>
+    const MCP_URL = "http://localhost:8003/mcp";
+    let availableTools = [];
+    let rawVisible = false;
+
+    function setStatus(msg, type = "info") {
+      const el = document.getElementById("status");
+      el.textContent = msg;
+      el.className = type;
+    }
+
+    function showRaw(data) {
+      document.getElementById("raw-output").textContent =
+        typeof data === "string" ? data : JSON.stringify(data, null, 2);
+      document.getElementById("raw-toggle").style.display = "block";
+    }
+
+    function toggleRaw() {
+      rawVisible = !rawVisible;
+      const el = document.getElementById("raw-output");
+      const toggle = document.getElementById("raw-toggle");
+      el.style.display = rawVisible ? "block" : "none";
+      toggle.textContent = rawVisible ? "▼ Hide raw response" : "▶ Show raw response";
+    }
+
+    // ── Core MCP call — handles both JSON and SSE ─────────────────────
+    async function mcpCall(method, params = {}) {
+      const res = await fetch(MCP_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method,
+          params,
+        }),
+      });
+
+      const contentType = res.headers.get("content-type") ?? "";
+
+      // ── JSON response ─────────────────────────────────────────────
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        showRaw(data);
+        if (data.error) throw new Error(data.error.message);
+        return data.result;
+      }
+
+      // ── SSE response — collect ALL events, return last result ─────
+      if (contentType.includes("text/event-stream")) {
+        const reader  = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let lastResult = null;
+        const allEvents = [];
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop(); // keep incomplete line
+
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+            const jsonStr = line.slice(5).trim();
+            if (!jsonStr || jsonStr === "[DONE]") continue;
+
+            try {
+              const event = JSON.parse(jsonStr);
+              allEvents.push(event);
+
+              // MCP result event
+              if (event.id && event.result !== undefined) {
+                lastResult = event.result;
+              }
+              // MCP error event
+              if (event.error) {
+                throw new Error(event.error.message);
+              }
+            } catch (e) {
+              if (e.message !== "JSON parse error") console.warn("SSE parse:", jsonStr);
+            }
+          }
+        }
+
+        showRaw(allEvents);
+        if (!lastResult) throw new Error("No result received from SSE stream");
+        return lastResult;
+      }
+
+      throw new Error(`Unsupported Content-Type: ${contentType}`);
+    }
+
+    // ── Health check ──────────────────────────────────────────────────
+    async function checkHealth() {
+      try {
+        const res  = await fetch("http://localhost:8003/health");
+        const data = await res.json();
+        setStatus(`✅ Server healthy — port ${data.port}`, "ok");
+        document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        setStatus(`❌ Server unreachable: ${err.message}`, "error");
+      }
+    }
+
+    // ── List tools ────────────────────────────────────────────────────
+    async function listTools() {
+      try {
+        setStatus("Loading tools...", "info");
+        const result = await mcpCall("tools/list");
+        availableTools = result.tools ?? [];
+
+        const select = document.getElementById("tool-name");
+        select.innerHTML = availableTools.map(t =>
+          `<option value="${t.name}">${t.name}</option>`
+        ).join("");
+
+        document.getElementById("tools-list").innerHTML =
+          availableTools.map(t =>
+            `<span class="tool-tag" title="${t.description ?? ""}">${t.name}</span>`
+          ).join("");
+
+        setStatus(`✅ Found ${availableTools.length} tools`, "ok");
+        document.getElementById("result").textContent =
+          JSON.stringify(availableTools.map(t => ({ name: t.name, description: t.description })), null, 2);
+
+      } catch (err) {
+        setStatus(`❌ ${err.message}`, "error");
+      }
+    }
+
+    // ── Load resource UI (the actual chart renderer HTML) ─────────────
+    async function loadResourceUI() {
+      try {
+        setStatus("Loading chart UI resource...", "info");
+        const result = await mcpCall("resources/read", {
+          uri: "ui://graph-visualization/visualization.html"
+        });
+
+        const html = result.contents?.[0]?.text;
+        if (!html) throw new Error("No HTML content in resource");
+
+        showChartInIframe(html);
+        document.getElementById("result").textContent = "Chart UI loaded in iframe below ↓";
+        setStatus("✅ Chart UI loaded", "ok");
+
+      } catch (err) {
+        setStatus(`❌ ${err.message}`, "error");
+        document.getElementById("result").textContent = err.message;
+      }
+    }
+
+    // ── Call create_visualization tool ────────────────────────────────
+    async function callTool() {
+      try {
+        const toolName = document.getElementById("tool-name").value || "create_visualization";
+        const data     = JSON.parse(document.getElementById("data-input").value);
+        const options  = JSON.parse(document.getElementById("options-input").value);
+
+        setStatus(`Calling ${toolName}...`, "info");
+
+        const result = await mcpCall("tools/call", {
+          name: toolName,
+          arguments: { data, ...options }
+        });
+
+        const content = result.content?.[0];
+        const resultEl = document.getElementById("result");
+
+        if (!content) {
+          resultEl.textContent = JSON.stringify(result, null, 2);
+          setStatus("✅ Done (no content block)", "ok");
+          return;
+        }
+
+        const text = content.text ?? "";
+
+        // HTML output → render in iframe
+        if (text.trim().startsWith("<") || text.includes("<!DOCTYPE")) {
+          showChartInIframe(text);
+          resultEl.textContent = "Chart rendered in iframe below ↓";
+          setStatus(`✅ Chart rendered — ${toolName}`, "ok");
+          return;
+        }
+
+        // JSON echoed args → load resource UI and inject data
+        try {
+          const echoed = JSON.parse(text);
+          resultEl.textContent = "Tool returned args (JSON). Loading chart UI with data...";
+          setStatus("✅ Got args — loading chart UI resource", "ok");
+
+          // Load the chart UI resource and pass data via postMessage
+          await loadResourceUIWithData(echoed);
+        } catch {
+          // Plain text
+          resultEl.textContent = text;
+          setStatus(`✅ Result — ${toolName}`, "ok");
+        }
+
+      } catch (err) {
+        setStatus(`❌ ${err.message}`, "error");
+        document.getElementById("result").textContent = err.message;
+      }
+    }
+
+    // ── Load resource UI and inject chart data via postMessage ─────────
+    async function loadResourceUIWithData(chartArgs) {
+      try {
+        const result = await mcpCall("resources/read", {
+          uri: "ui://graph-visualization/visualization.html"
+        });
+        const html = result.contents?.[0]?.text;
+        if (!html) throw new Error("No HTML in resource");
+
+        const iframe = showChartInIframe(html);
+
+        // After iframe loads, send chart data via postMessage
+        iframe.addEventListener("load", () => {
+          iframe.contentWindow.postMessage(
+            { type: "render", payload: chartArgs },
+            "*"
+          );
+        });
+
+        document.getElementById("result").textContent =
+          "Chart UI loaded with data:\n" + JSON.stringify(chartArgs, null, 2);
+
+      } catch (err) {
+        document.getElementById("result").textContent = `Could not load chart UI: ${err.message}\n\nRaw args:\n${JSON.stringify(chartArgs, null, 2)}`;
+      }
+    }
+
+    // ── Render HTML in iframe ─────────────────────────────────────────
+    function showChartInIframe(html) {
+      const container = document.getElementById("chart-container");
+      const iframe    = document.getElementById("chart-frame");
+      container.style.display = "block";
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(html);
+      iframe.contentDocument.close();
+      iframe.scrollIntoView({ behavior: "smooth" });
+      return iframe;
+    }
+
+    // ── Sample presets ────────────────────────────────────────────────
+    function loadSample(type) {
+      const samples = {
+        bar: {
+          data: [
+            { name: "Cisco", value: 45 },
+            { name: "Juniper", value: 23 },
+            { name: "Arista", value: 12 },
+            { name: "Palo Alto", value: 8 }
+          ],
+          options: { chartType: "bar", title: "Devices by Vendor", xAxis: "name", yAxis: "value" }
+        },
+        line: {
+          data: [
+            { month: "Jan", traffic: 120 },
+            { month: "Feb", traffic: 145 },
+            { month: "Mar", traffic: 98 },
+            { month: "Apr", traffic: 180 },
+            { month: "May", traffic: 210 }
+          ],
+          options: { chartType: "line", title: "Monthly Traffic (Gbps)", xAxis: "month", yAxis: "traffic" }
+        },
+        pie: {
+          data: [
+            { name: "Active", value: 89 },
+            { name: "Down", value: 7 },
+            { name: "Unknown", value: 4 }
+          ],
+          options: { chartType: "pie", title: "Interface Status" }
+        },
+        network: {
+          data: [
+            { name: "Core", value: 4 },
+            { name: "Distribution", value: 12 },
+            { name: "Access", value: 48 },
+            { name: "Edge", value: 6 }
+          ],
+          options: { chartType: "bar", title: "Network Layer Device Count", xAxis: "name", yAxis: "value" }
+        }
+      };
+
+      const s = samples[type];
+      document.getElementById("data-input").value  = JSON.stringify(s.data, null, 2);
+      document.getElementById("options-input").value = JSON.stringify(s.options, null, 2);
+    }
+
+    // Auto-load on start
+    checkHealth().then(() => listTools());
+  </script>
+</body>
+</html>

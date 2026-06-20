@@ -9,7 +9,12 @@ services:
     env_file: .env
     environment:
       - LOCAL_LLM_BASE_URL=http://host.docker.internal:11434/v1
-      - MCP_SERVER_URL=http://mcp-forward:8000/mcp
+      - LOCAL_LLM_CHAT_URL=http://host.docker.internal:11434/api/chat
+      - LOCAL_LLM_MODEL=qwen2.5:7b
+      - CISCO_MCP_URL=http://mcp-cisco:8001/mcp
+      - FORWARD_MCP_URL=http://mcp-forward:8000/mcp
+      - HEXSTRIKE_MCP_URL=http://mcp-hexstrike:8002/mcp
+      - TARGET_WEBSITE=http://localhost:5000
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -31,7 +36,10 @@ services:
     env_file: .env
     environment:
       - LOCAL_LLM_BASE_URL=http://host.docker.internal:11434/v1
+      - LOCAL_LLM_CHAT_URL=http://host.docker.internal:11434/api/chat
+      - LOCAL_LLM_MODEL=qwen2.5:7b
       - CISCO_MCP_URL=http://mcp-cisco:8001/mcp
+      - FORWARD_MCP_URL=http://mcp-forward:8000/mcp
       - HEXSTRIKE_MCP_URL=http://mcp-hexstrike:8002/mcp
       - TARGET_WEBSITE=http://localhost:5000
     extra_hosts:

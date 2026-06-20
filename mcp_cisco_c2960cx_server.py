@@ -124,6 +124,7 @@ server = FastMCP(name="cisco-c2960cx", host="0.0.0.0", log_level="ERROR", port=8
     )
 )
 def cisco_show(host: str,  command: str):
+    print(f"cisco_show function running command:{command} on {host}: {CISCO_DEVICE_USER}")
     result = ssh_run_command(host, command)
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
@@ -133,6 +134,7 @@ def cisco_show(host: str,  command: str):
     description="List all allowed read-only commands for the Cisco C2960CX MCP tool."
 )
 def cisco_list_commands():
+    print(f"Listing allowed commands for {CISCO_DEVICE_USER}")
     return [TextContent(
         type="text",
         text=json.dumps({"allowed_commands": sorted(ALLOWED_COMMANDS)}, indent=2)
