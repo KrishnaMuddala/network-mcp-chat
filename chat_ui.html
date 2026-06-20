@@ -489,7 +489,7 @@
     // ── Check tool status ─────────────────────────────────────────────────────
     async function checkStatus() {
       try {
-        const r = await fetch(`/tools`);
+        const r = await fetch(`${BASE}/tools`);
         const d = await r.json();
         const hasForward = d.tools.some(t => t.startsWith("forward__"));
         const hasCisco = d.tools.some(t => t.startsWith("cisco__"));
