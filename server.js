@@ -107,12 +107,17 @@ const forwardClient = new MCPClient(process.env.FORWARD_MCP_URL ?? "http://local
 const ciscoClient = new MCPClient(
   process.env.CISCO_MCP_URL ?? "http://localhost:8001/mcp"
 );
+const memoryClient = new MCPClient(
+  process.env.MEMORY_MCP_URL ?? "http://localhost:8002/mcp"
+);
 await forwardClient.connect();
 await ciscoClient.connect();
+await memoryClient.connect();
 
 const forwardTools = await forwardClient.listTools();
 const ciscoTools   = await ciscoClient.listTools();
-const mcpTools = [...forwardTools, ...ciscoTools];
+const memoryTools  = await memoryClient.listTools();
+const mcpTools = [...forwardTools, ...ciscoTools, ...memoryTools];
 
 // ── Tool name → client lookup map ───────────────────────────────────────
 // This fixes "Unknown tool" errors — without this map, ALL tool calls
@@ -120,6 +125,7 @@ const mcpTools = [...forwardTools, ...ciscoTools];
 const toolClientMap = {};
 for (const t of forwardTools) toolClientMap[t.name] = forwardClient;
 for (const t of ciscoTools)   toolClientMap[t.name] = ciscoClient;
+for (const t of memoryTools)  toolClientMap[t.name] = memoryClient;
 
 function getClientForTool(toolName) {
   const client = toolClientMap[toolName];
@@ -132,6 +138,7 @@ function getClientForTool(toolName) {
 console.log(`✅ Connected to MCP servers with tools: ${mcpTools.map(t => t.name).join(", ")}`);
 console.log(`   Forward Networks tools: ${forwardTools.map(t => t.name).join(", ")}`);
 console.log(`   Cisco tools: ${ciscoTools.map(t => t.name).join(", ")}`);
+console.log(`   Memory tools: ${memoryTools.map(t => t.name).join(", ")}`);
 
 const LLM_BASE_URL = process.env.LOCAL_LLM_BASE_URL ?? "http://localhost:11434/v1";
 
@@ -148,6 +155,7 @@ console.log("🤖 LLM Model     :", currentModel);
 console.log("🌐 LLM Base URL  :", LLM_BASE_URL);
 console.log("🔌 Forward MCP   :", process.env.FORWARD_MCP_URL ?? "http://localhost:8000/mcp");
 console.log("🔌 Cisco MCP     :", process.env.CISCO_MCP_URL ?? "http://localhost:8001/mcp");
+console.log("🔌 Memory MCP    :", process.env.MEMORY_MCP_URL ?? "http://localhost:8002/mcp");
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
 // Conversation history per session (simple in-memory)
