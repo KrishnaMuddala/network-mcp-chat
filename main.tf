@@ -97,76 +97,103 @@ resource "aws_instance" "netops_gpu" {
   tags = { Name = "netops-chat-cpu" }
 
   user_data = <<-EOF
-    #!/bin/bash
-    set -e
-    exec > /var/log/cloud-init-output.log 2>&1
+#!/bin/bash
+set -e
+exec > /var/log/cloud-init-output.log 2>&1
 
-    echo "=== [1/7] System update ==="
-    apt update && apt upgrade -y
-    apt install -y git curl awscli ca-certificates gnupg
+echo "=== [1/10] System update ==="
+apt update && apt upgrade -y
+apt install -y git curl awscli ca-certificates gnupg
 
-    # Install Docker from official Docker repo (not Ubuntu's)
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
+# Install Docker from official Docker repo (not Ubuntu's)
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
 
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg]  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg]  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-    apt update
-    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-    systemctl enable docker
-    systemctl start docker
+systemctl enable docker
+systemctl start docker
 
-    echo "=== [2/7] Install Ollama ==="
-    curl -fsSL https://ollama.com/install.sh | sh
+echo "=== [2/10] Install Ollama ==="
+curl -fsSL https://ollama.com/install.sh | sh
 
-    echo "=== [3/7] Start Ollama + pull model ==="
-    export HOME=/root
-    export OLLAMA_HOST=0.0.0.0:11434
-    sudo nohup ollama serve > /var/log/ollama.log 2>&1 &
-    sleep 20
+echo "=== [3/10] Start Ollama + pull model ==="
+export HOME=/root
+export OLLAMA_HOST=0.0.0.0:11434
+sudo nohup ollama serve > /var/log/ollama.log 2>&1 &
+sleep 20
 
-    # Wait until Ollama API responds
-    until curl -s http://localhost:11434/api/tags > /dev/null; do
-      echo "Waiting for Ollama..."
-      sleep 5
-    done
+# Wait until Ollama API responds
+until curl -s http://localhost:11434/api/tags > /dev/null; do
+echo "Waiting for Ollama..."
+sleep 5
+done
 
-    HOME=/root ollama pull qwen2.5:7b
-    echo "Model pulled successfully"
+HOME=/root ollama pull qwen2.5:7b
+echo "Model pulled successfully"
 
-    echo "=== [4/7] Clone repo ==="
-    cd /home/ubuntu
-    git clone https://github.com/KrishnaMuddala/network-mcp-chat.git
-    cd network-mcp-chat
+echo "=== [4/10] Clone network-mcp-chat repo ==="
+cd /home/ubuntu
+git clone https://github.com/KrishnaMuddala/network-mcp-chat.git
+cd network-mcp-chat
 
-    echo "=== [5/7] Pull secrets ==="
-    aws secretsmanager get-secret-value \
-      --secret-id "netops-chat/env" \
-      --region ap-southeast-1 \
-      --query SecretString \
-      --output text > .env
+echo "=== [5/10] Pull secrets ==="
+aws secretsmanager get-secret-value \
+--secret-id "netops-chat/env" \
+--region ap-southeast-1 \
+--query SecretString \
+--output text > .env
 
-    aws secretsmanager get-secret-value \
-      --secret-id "netops-chat/users" \
-      --region ap-southeast-1 \
-      --query SecretString \
-      --output text > users.json
+aws secretsmanager get-secret-value \
+--secret-id "netops-chat/users" \
+--region ap-southeast-1 \
+--query SecretString \
+--output text > users.json
 
-    echo "=== [6/7] TLS cert ==="
-    mkdir -p certs
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout certs/privkey.pem \
-      -out certs/fullchain.pem \
-      -subj "/CN=netops-internal"
+echo "=== [6/10] TLS cert ==="
+mkdir -p certs
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+-keyout certs/privkey.pem \
+-out certs/fullchain.pem \
+-subj "/CN=netops-internal"
 
-    echo "=== [7/7] Deploy ==="
-    chown -R ubuntu:ubuntu /home/ubuntu/network-mcp-chat
-    docker compose -f docker-compose.prod.yml up --build -d
+echo "=== [7/10] Deploy network-mcp-chat ==="
+chown -R ubuntu:ubuntu /home/ubuntu/network-mcp-chat
+docker compose -f docker-compose.prod.yml up --build -d
+echo "=== [8/11] Clone server repo ==="
+cd /home/ubuntu
+git clone https://github.com/KrishnaMuddala/server.git
+cd server/src/memory
 
-    echo "=== Setup Complete ==="
-  EOF
+echo "=== [8/10] Pull secrets ==="
+aws secretsmanager get-secret-value \
+--secret-id "netops-chat/env" \
+--region ap-southeast-1 \
+--query SecretString \
+--output text > .env
+
+echo "=== [9/10] Deploy server tool ==="
+chown -R ubuntu:ubuntu /home/ubuntu/server/src/memory
+docker compose -f docker-compose.prod.yaml up --build -d
+echo "=== [10/10] Ollam restarting server tool ==="
+pkill -f ollama
+export HOME=/root
+export OLLAMA_HOST=0.0.0.0:11434
+
+# Start the ollama service in the background and redirect logs
+nohup ollama serve > /var/log/ollama.log 2>&1 &
+
+# Wait for the service to start
+sleep 5
+
+# Verify the API endpoint
+curl http://localhost:11434/api/tags
+echo "=== Setup Complete ==="
+EOF
 }
 
 # ── Elastic IP ────────────────────────────────────────────────────────────
