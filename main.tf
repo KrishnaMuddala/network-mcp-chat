@@ -179,7 +179,7 @@ aws secretsmanager get-secret-value \
 echo "=== [9/10] Deploy server tool ==="
 chown -R ubuntu:ubuntu /home/ubuntu/server/src/memory
 docker compose -f docker-compose.prod.yaml up --build -d
-cd server/src/sequentialthinking
+cd ../sequentialthinking
 aws secretsmanager get-secret-value \
 --secret-id "netops-chat/env" \
 --region ap-southeast-1 \
