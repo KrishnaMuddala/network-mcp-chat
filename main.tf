@@ -179,6 +179,15 @@ aws secretsmanager get-secret-value \
 echo "=== [9/10] Deploy server tool ==="
 chown -R ubuntu:ubuntu /home/ubuntu/server/src/memory
 docker compose -f docker-compose.prod.yaml up --build -d
+cd server/src/sequentialthinking
+aws secretsmanager get-secret-value \
+--secret-id "netops-chat/env" \
+--region ap-southeast-1 \
+--query SecretString \
+--output text > .env
+chown -R ubuntu:ubuntu /home/ubuntu/server/src/sequentialthinking
+docker compose -f docker-compose.prod.yaml up --build -d
+
 echo "=== [10/10] Ollam restarting server tool ==="
 pkill -f ollama
 export HOME=/root
