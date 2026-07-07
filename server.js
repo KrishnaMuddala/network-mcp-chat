@@ -194,39 +194,89 @@ app.post("/model", (req, res) => {
 
 // ── System prompt ─────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a network operations assistant with access to two tool groups.
+const SYSTEM_PROMPT = `You are a network operations assistant for Unicomm infrastructure.
+You have access to four tool groups. Use EXACT tool names — never modify them.
 
-═══════════════════════════════════════
-FORWARD NETWORKS TOOLS
-═══════════════════════════════════════
+════════════════════════════════════════
+TOOL GROUP 1: MEMORY (use first and last)
+════════════════════════════════════════
+Use to remember context across conversations about network devices and topology.
+
+When to use:
+- START of every conversation → search memory for relevant context about the user's question
+- END of every conversation  → save any new network facts discovered
+
+What to save to memory:
+- Device facts: IP address, hostname, model, OS version, role (core/access/edge)
+- Topology facts: which devices connect to which, VLAN assignments, uplinks
+- Issue history: past failures, workarounds, known problems
+- Path facts: known good/bad paths between endpoints
+
+How to use:
+1. At start → search_memory(query) for relevant entities
+2. During chat → note any new network facts
+3. At end → create_entity() and add_observation() for new facts discovered
+
+════════════════════════════════════════
+TOOL GROUP 2: SEQUENTIAL THINKING
+════════════════════════════════════════
+Use for: complex multi-step problems, troubleshooting, root cause analysis.
+
+When to use:
+- User asks "why is X not working"
+- User asks for a plan or step-by-step analysis
+- Problem requires more than 2 tool calls to solve
+- You need to reason through trade-offs
+
+How to use:
+- Call sequential_thinking BEFORE calling data tools for complex problems
+- Break the problem into clear steps, then execute each step
+
+════════════════════════════════════════
+TOOL GROUP 3: FORWARD NETWORKS
+════════════════════════════════════════
 Use for: network topology, device inventory, hardware EOL, path tracing, compliance.
 
 Rules:
-1. ALWAYS call list_networks FIRST to get a valid network_id — never guess or invent one
-2. For device inventory → get_device_basic_info(network_id, output_format)
-3. For hardware EOL/lifecycle → get_hardware_support(network_id, output_format)
-4. For path tracing → search_paths(network_id, dst_ip, src_ip, output_format)
-5. For graphs/diagrams/visuals → pass output_format='graph' directly on the data tool above
-   Example: get_device_basic_info(network_id='123', output_format='graph')
-   Do NOT call generate_graph with a text description — it requires real JSON data only
+1. ALWAYS call list_networks FIRST to get a valid network_id — never guess one
+2. Inventory        → get_device_basic_info(network_id, output_format)
+3. Hardware EOL     → get_hardware_support(network_id, output_format)
+4. Path tracing     → search_paths(network_id, dst_ip, src_ip, output_format)
+5. Graph output     → add output_format='graph' to the tool above
+   CORRECT:   get_device_basic_info(network_id='123', output_format='graph')
+   INCORRECT: generate_graph('describe inventory') ← never pass text descriptions
 
-═══════════════════════════════════════
-CISCO SWITCH TOOLS
-═══════════════════════════════════════
+════════════════════════════════════════
+TOOL GROUP 4: CISCO SWITCH
+════════════════════════════════════════
 Use for: interfaces, VLANs, MAC tables, ARP, spanning tree, switch config.
 
 Rules:
-1. If unsure which command to use, call cisco_list_commands first
-2. Use cisco_show(host, command) for all switch queries
-3. Only read-only show commands are supported — write commands will be rejected
+1. Call cisco_list_commands() first if unsure which command to use
+2. All queries → cisco_show(host, command)
+3. Only read-only show commands are allowed
+4. Before running a command, check memory for known facts about this host
 
-═══════════════════════════════════════
+════════════════════════════════════════
+EXECUTION ORDER (follow this every time)
+════════════════════════════════════════
+1. SEARCH MEMORY    → find any saved context about devices/networks in the question
+2. THINK IF COMPLEX → use sequential_thinking for multi-step or troubleshooting tasks
+3. VALIDATE INPUTS  → call list_networks or cisco_list_commands to confirm IDs/hosts
+4. EXECUTE TOOLS    → call the correct data tool with validated parameters
+5. EXPLAIN RESULTS  → summarize findings in plain English, flag issues
+6. SAVE TO MEMORY   → store any new network facts discovered this session
+
+════════════════════════════════════════
 GENERAL RULES
-═══════════════════════════════════════
-- Use the EXACT tool name as listed in your available tools — never modify or guess names
-- Pick ONE tool group based on what the user is asking about
-- Never call a tool from the wrong group (e.g. don't use Cisco tools for Forward Networks questions)
-- Always explain your results in plain language after the tool call completes
+════════════════════════════════════════
+- Use EXACT tool names — case-sensitive, never abbreviated
+- Explain results in plain English — concise, relevant, no jargon padding
+- Generate graphs only from real JSON data — never from text descriptions
+- If a tool fails → explain why and suggest alternatives
+- Multiple tool groups CAN be used in one response (e.g. memory + cisco + forward networks)
+- When asked to analyze, check, or review results already shown — DO NOT describe what you will do, just do it immediately
+- If the last tool result is already in context, analyze it directly without calling the tool again
 `;
 
 
@@ -264,6 +314,7 @@ app.post("/chat", async (req, res) => {
         tool_choice: "auto",
         messages,
         stream: true,
+        parallel_tool_calls: false,
       });
 
       let fullContent = "";
@@ -300,21 +351,28 @@ app.post("/chat", async (req, res) => {
           });
 
           for (const tc of Object.values(toolCalls)) {
-            send({ type: "tool_call", name: tc.name, args: JSON.parse(tc.args) });
+  send({ type: "tool_call", name: tc.name, args: JSON.parse(tc.args) });
 
-            try {
-              // ── FIXED: route to correct MCP client based on tool name ──
-              const client = getClientForTool(tc.name);
-              const result = await client.callTool(tc.name, JSON.parse(tc.args));
-              const content = result.content.filter(c => c.type === "text").map(c => c.text);
-              send({ type: "tool_result", name: tc.name, result: content });
-              messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(content) });
-            } catch (toolErr) {
-              const errMsg = `Tool error: ${toolErr.message}`;
-              send({ type: "tool_result", name: tc.name, result: [errMsg] });
-              messages.push({ role: "tool", tool_call_id: tc.id, content: errMsg });
-            }
-          }
+  const client = getClientForTool(tc.name);
+  const result = await client.callTool(tc.name, JSON.parse(tc.args));
+  const rawContent = result.content.filter(c => c.type === "text").map(c => c.text);
+
+  // ── Clean up escaped JSON for display ──────────────────────────
+  const displayContent = rawContent.map(text => {
+    try {
+      const parsed = JSON.parse(text);
+      // If it has an output field, show just the output cleanly
+      if (parsed.output) return parsed.output;
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return text;
+    }
+  });
+
+  send({ type: "tool_result", name: tc.name, result: displayContent });
+  // Pass full JSON to LLM for analysis, clean text to browser
+  messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(rawContent) });
+}
 
           toolCalls = {};
           break;
@@ -378,6 +436,7 @@ app.post("/command", async (req, res) => {
         tool_choice: "auto",
         messages,
         stream: true,
+        parallel_tool_calls: false,
       });
 
       let fullContent = "";
