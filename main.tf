@@ -84,7 +84,7 @@ resource "aws_security_group" "netops_sg" {
 # ── EC2 Instance ──────────────────────────────────────────────────────────
 resource "aws_instance" "netops_gpu" {
   ami                    = var.ubuntu_ami
-  instance_type          = "g4dn.2xlarge"   # swap to g4dn.xlarge or c6i.2xlarge after GPU quota approved
+  instance_type          = "g4dn.2xlarge"   # swap to g4dn.xlarge or c6i.2xlarge after GPU quota approved or g5.xlarge
   key_name               = var.key_pair_name
   vpc_security_group_ids = [aws_security_group.netops_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.netops_profile.name
