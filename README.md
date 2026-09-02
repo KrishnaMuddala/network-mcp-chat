@@ -129,6 +129,30 @@ Open [http://localhost:3000](http://localhost:3000) and log in.
 
 ---
 
+## Demos
+
+**MCP Chat (document / demo MCP server) — qwen via Ollama**
+
+![MCP Chat Streamable HTTP demo](assets/demo.png)
+
+**Cisco C2960CX — query the switch with natural language**
+
+![Cisco IOS-XE MCP Chat Streamable HTTP demo](assets/cisco_mcpclient.png)
+
+**Forward Networks — inventory, NQE, path tracing and compliance**
+
+![Forward Networks MCP Chat Streamable HTTP demo](assets/Forwardnetwork_mcpclient.png)
+
+**Document upload & summarization**
+
+![Document summary Chat Streamable HTTP demo](assets/Documentupload.png)
+
+**HexStrike security scanning**
+
+![HexStrike MCP Chat Streamable HTTP demo](assets/Hexstrike_scan.png)
+
+---
+
 ## Running with Docker
 
 `docker-compose.yaml` and `docker-compose.prod.yml` define the services (`web-ui`, `mcp-forward`, `mcp-cisco`, `chat-ui`, `nginx`). A `.env.docker` file is expected. Ollama is accessed via `host.docker.internal:11434`.
