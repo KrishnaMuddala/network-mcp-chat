@@ -127,6 +127,39 @@ node server.js
 
 Open [http://localhost:3000](http://localhost:3000) and log in.
 
+**Default login credentials:** username `admin`, password `admin123` (edit `users.json` to change them — see step 4).
+
+### All-in-one start (optional)
+
+Start all 4 MCP servers in the background and run the web UI in the foreground:
+
+```bash
+cd /home/your-user/network-mcp-chat && \
+setsid python mcp_fwdnetworkserver.py >/tmp/fwd.log 2>&1 & \
+setsid python mcp_cisco_c2960cx_server.py >/tmp/cisco.log 2>&1 & \
+setsid python mcp_memory_server.py >/tmp/memory.log 2>&1 & \
+setsid python mcp_sequential_thinking_server.py >/tmp/seq.log 2>&1 & \
+node server.js
+```
+
+Stop everything with:
+```bash
+pkill -f "mcp_.*_server\.py"; pkill -f "node server.js"
+```
+
+### NetSec chat UI (optional, `:9000`)
+
+A separate browser UI (no login) served by `chat_server.py`. It loads the Forward and Cisco tools (prefixed `forward__` / `cisco__`) and lets you chat with the switch and network from a single page.
+
+```bash
+source .venv/bin/activate
+python chat_server.py        # requires flask: pip install "flask>=3.0,<4.0"
+```
+
+Open [http://localhost:9000](http://localhost:9000).
+
+> Requires the Forward (`:8000`) and Cisco (`:8001`) MCP servers to be running. Add `flask` to the venv if missing.
+
 ---
 
 ## Demos
@@ -319,7 +352,41 @@ curl -X POST http://localhost:<port>/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}'
 ```
 
-**Cisco SSH fails**
+**Cisco SSH fails — legacy key exchange negotiation**
+
+Older Cisco devices (e.g. C2960CX running IOS 15.2) only support legacy SSH algorithms and do not advertise `server-sig-algs`. With modern paramiko/netmiko this produces an error like:
+```
+no matching key exchange / no matching key exchange method found
+```
+
+`mcp_cisco_c2960cx_server.py` already handles this by passing legacy SSH options to netmiko:
+```python
+"disable_sha2_fix": True,
+"disabled_algorithms": {
+    "pubkeys": ["rsa-sha2-256", "rsa-sha2-512"],
+    "keys": ["rsa-sha2-256", "rsa-sha2-512"],
+},
+```
+This forces legacy `ssh-rsa` / group14 KEX negotiation. If you add these options yourself via the OpenSSH client, the equivalent is:
+```bash
+ssh -o KexAlgorithms=+diffie-hellman-group14-sha1,diffie-hellman-group1-sha1 \
+    -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa \
+    -o Ciphers=+aes128-cbc,aes256-cbc admin@<switch-ip>
+```
+
+**Cisco SSH fails — connection timeout (not KEX)**
+
+If you get `Connection timed out. Check host/port.` (a `NetmikoTimeoutException`), the switch's port 22 (or your configured `CISCO_DEVICE_PORT`) is **filtered** from your network — packets are dropped, not refused. Note: a KEX error means the port *is* reachable (negotiation got going); a timeout means it's blocked before SSH even starts.
+
+Quick checks:
+```bash
+ping -c 3 <switch-ip>                       # reachable?
+nc -vz -w 5 <switch-ip> 22                  # is port 22 open?
+nc -vz -w 5 <switch-ip> 443                 # is anything reachable?
+```
+If 443/80 respond but 22 times out, an ACL/firewall (on the VTY lines or the WAN interface) is dropping port 22. Either allow your source IP on port 22, or connect from a permitted network.
+
+Basic netmiko test:
 ```bash
 python -c "
 from netmiko import ConnectHandler
